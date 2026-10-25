@@ -195,7 +195,7 @@ class _EditorHomeState extends State<EditorHome> {
         musicVolume = (data['musicVolume'] as num?)?.toDouble() ?? .75;
         speed = (data['speed'] as num?)?.toDouble() ?? 1;
         trimIn = (data['trimIn'] as num?)?.toDouble() ?? 0;
-        trimOut = next == null ? 1 : ((data['trimOut'] as num?)?.toDouble() ?? seconds).clamp(.25, next.value.duration.inMilliseconds / 1000).toDouble();
+        trimOut = next == null ? 1 : ((data['trimOut'] as num?)?.toDouble() ?? (next.value.duration.inMilliseconds / 1000)).clamp(.25, next.value.duration.inMilliseconds / 1000).toDouble();
       });
       next?.addListener(tick);
       if (next != null) await next.setPlaybackSpeed(speed);
