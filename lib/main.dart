@@ -55,7 +55,7 @@ class _EditorPageState extends State<EditorPage> {
   String overlay = '';
   String aspect = '9:16';
   String filter = 'None';
-  double musicVolume = .75, speed = 1;
+  double musicVolume = .75, originalVolume = .85, speed = 1, fadeSeconds = .35;
   bool busy = false;
   String status = 'Import videos to start editing';
   int selected = 0;
@@ -187,7 +187,7 @@ class _EditorPageState extends State<EditorPage> {
     final dir = await projectDir();
     final data = {'version': 2, 'clips': clips.map((c) => c.toJson()).toList(),
       'musicPath': musicPath, 'overlay': overlay, 'aspect': aspect, 'filter': filter,
-      'musicVolume': musicVolume, 'speed': speed, 'savedAt': DateTime.now().toIso8601String()};
+      'musicVolume': musicVolume, 'originalVolume': originalVolume, 'speed': speed, 'fadeSeconds': fadeSeconds, 'savedAt': DateTime.now().toIso8601String()};
     await File('${dir.path}/project.json').writeAsString(const JsonEncoder.withIndent('  ').convert(data));
     notify('Project saved offline on this device');
   }
@@ -205,7 +205,9 @@ class _EditorPageState extends State<EditorPage> {
       aspect = data['aspect'] as String? ?? '9:16';
       filter = data['filter'] as String? ?? 'None';
       musicVolume = (data['musicVolume'] as num?)?.toDouble() ?? .75;
+      originalVolume = (data['originalVolume'] as num?)?.toDouble() ?? .85;
       speed = (data['speed'] as num?)?.toDouble() ?? 1;
+      fadeSeconds = (data['fadeSeconds'] as num?)?.toDouble() ?? .35;
       selected = 0;
       if (clips.isNotEmpty && await File(clips.first.path).exists()) {
         await loadPreview(clips.first);
@@ -245,11 +247,13 @@ class _EditorPageState extends State<EditorPage> {
       for (var i = 0; i < clips.length; i++) {
         final c = clips[i];
         final out = '${work.path}/segment_${i.toString().padLeft(3, '0')}.mp4';
-        final vf = videoFilter();
+        final fd = fadeSeconds.clamp(0.0, c.length / 2).toDouble();
+        final fades = fd <= 0 ? '' : ',fade=t=in:st=0:d=$fd,fade=t=out:st=${(c.length - fd).clamp(0.0, c.length)}:d=$fd';
+        final vf = videoFilter() + fades;
         final caption = overlay.trim().isEmpty ? '' :
           ",drawtext=fontfile=/system/fonts/Roboto-Regular.ttf:text='${overlay.replaceAll('\\', '\\\\').replaceAll(':', '\\:').replaceAll("'", "\\'").replaceAll('%', '\\%').replaceAll(',', '\\,')}':fontcolor=white:fontsize=48:box=1:boxcolor=black@0.55:boxborderw=16:x=(w-text_w)/2:y=h-text_h-100";
         final command = '-y -ss ${c.start.toStringAsFixed(3)} -i ${quote(c.path)} -t ${c.length.toStringAsFixed(3)} '
-          '-vf ${quote(vf + caption)} -filter:a "atempo=${speed.clamp(.5, 2).toStringAsFixed(2)}" '
+          '-vf ${quote(vf + caption)} -filter:a "atempo=${speed.clamp(.5, 2).toStringAsFixed(2)},volume=${originalVolume.toStringAsFixed(2)},afade=t=in:st=0:d=${fd.toStringAsFixed(2)},afade=t=out:st=${(c.length-fd).clamp(0.0,c.length).toStringAsFixed(2)}:d=${fd.toStringAsFixed(2)}" '
           '-c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -c:a aac -b:a 160k -ar 44100 -ac 2 '
           '-avoid_negative_ts make_zero -movflags +faststart ${quote(out)}';
         final session = await FFmpegKit.execute(command);
@@ -382,6 +386,14 @@ class _EditorPageState extends State<EditorPage> {
             Expanded(child: Slider(value: speed, min: .5, max: 2, divisions: 6, label: '${speed}x',
               onChanged: (v) { setState(() => speed = v); player?.setPlaybackSpeed(v); })),
             Text('${speed}x', style: const TextStyle(color: cyan)),
+          ]),
+          Row(children: [const Icon(Icons.volume_up, size: 18), const SizedBox(width: 8), const Text('Original audio'),
+            Expanded(child: Slider(value: originalVolume, min: 0, max: 1, onChanged: (v) => setState(() => originalVolume = v))),
+            Text('${(originalVolume * 100).round()}%', style: const TextStyle(color: cyan)),
+          ]),
+          Row(children: [const Icon(Icons.blur_on, size: 18), const SizedBox(width: 8), const Text('Fade in/out'),
+            Expanded(child: Slider(value: fadeSeconds, min: 0, max: 2, divisions: 8, label: '${fadeSeconds.toStringAsFixed(2)}s', onChanged: (v) => setState(() => fadeSeconds = v))),
+            Text('${fadeSeconds.toStringAsFixed(2)}s', style: const TextStyle(color: cyan)),
           ]),
           if (musicPath != null) Row(children: [const Icon(Icons.graphic_eq, size: 18), const SizedBox(width: 8),
             Expanded(child: Text(musicPath!.split(Platform.pathSeparator).last, maxLines: 1, overflow: TextOverflow.ellipsis)),
