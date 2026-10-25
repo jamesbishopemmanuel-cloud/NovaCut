@@ -278,7 +278,7 @@ class _EditorHomeState extends State<EditorHome> {
               if (overlayText.isNotEmpty) Positioned(left: 10, right: 10, bottom: 34, child: Container(color: Colors.black54, padding: const EdgeInsets.all(8), child: Text(overlayText, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold))))
             ]))) else const Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.movie_creation_outlined, size: 58, color: cyan), SizedBox(height: 12), Text('Make every frame count'), Text('Import a video to begin', style: TextStyle(color: Colors.white60))]),
             if (busy) const CircularProgressIndicator(color: cyan),
-            Positioned(left: 12, right: 12, top: 12, child: Row(children: [pill(ratio, Icons.aspect_ratio), const Spacer(), pill(transition, Icons.transition)])),
+            Positioned(left: 12, right: 12, top: 12, child: Row(children: [pill(ratio, Icons.aspect_ratio), const Spacer(), pill(transition, Icons.auto_awesome_motion)])),
             Positioned(bottom: 4, left: 6, right: 6, child: Row(children: [
               IconButton(onPressed: () { setState(() => muted = !muted); video?.setVolume(muted ? 0 : 1); }, icon: Icon(muted ? Icons.volume_off : Icons.volume_up)),
               Text(time(pos), style: const TextStyle(fontSize: 11)),
@@ -318,7 +318,7 @@ class _EditorHomeState extends State<EditorHome> {
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             tool('Audio', Icons.music_note, importAudio),
             tool('Text', Icons.title, editText),
-            tool('Transition', Icons.transition, chooseTransition),
+            tool('Transition', Icons.auto_awesome_motion, chooseTransition),
             tool('Save', Icons.save_outlined, saveProject),
             tool('Load', Icons.folder_open, loadProject)
           ]),
