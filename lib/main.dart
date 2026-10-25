@@ -454,6 +454,22 @@ class _EditorPageState extends State<EditorPage> {
               items: const ['None','Grayscale','Warm','Vintage'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
               onChanged: (v) => setState(() => filter = v ?? filter))),
           ]),
+          if (current != null && ready) Row(children: [
+            const Icon(Icons.content_cut, size: 18), const SizedBox(width: 8), const Text('Trim'),
+            Expanded(child: RangeSlider(
+              min: 0,
+              max: p!.value.duration.inMilliseconds / 1000,
+              values: RangeValues(current.start, current.end),
+              labels: RangeLabels(stamp(current.start), stamp(current.end)),
+              onChangeStart: (_) => checkpoint(),
+              onChanged: (v) {
+                if (v.end - v.start >= .2) {
+                  setState(() { current.start = v.start; current.end = v.end; });
+                }
+              },
+              onChangeEnd: (v) => p.seekTo(Duration(milliseconds: (v.start * 1000).round())),
+            )),
+          ]),
           Row(children: [const Icon(Icons.speed, size: 18), const SizedBox(width: 8), const Text('Speed'),
             Expanded(child: Slider(value: speed, min: .5, max: 2, divisions: 6, label: '${speed}x',
               onChanged: (v) { setState(() => speed = v); player?.setPlaybackSpeed(v); })),
