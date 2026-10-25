@@ -29,8 +29,8 @@ jobs:
               raise SystemExit("Android app Gradle file was not generated")
           for path in files:
               source = path.read_text()
-              updated = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", source)
-              updated = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", updated)
+              updated = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 24", source)
+              updated = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 24", updated)
               if updated != source:
                   path.write_text(updated)
           print("Checked Android minimum SDK (FFmpeg requires API 24+).")
