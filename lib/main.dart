@@ -22,7 +22,7 @@ class ClipItem {
   final String path;
   double start;
   double end;
-  double get length => (end - start).clamp(0.0, double.infinity);
+  double get length => (end - start).clamp(0.0, double.infinity).toDouble();
   Map<String, dynamic> toJson() => {'id': id, 'path': path, 'start': start, 'end': end};
   factory ClipItem.fromJson(Map<String, dynamic> j) => ClipItem(
     id: j['id'] as String?, path: j['path'] as String,
@@ -60,8 +60,8 @@ class _EditorPageState extends State<EditorPage> {
   String status = 'Import videos to start editing';
   int selected = 0;
 
-  double get total => clips.fold(0, (v, c) => v + c.length);
-  ClipItem? get active => clips.isEmpty ? null : clips[selected.clamp(0, clips.length - 1)];
+  double get total => clips.fold<double>(0.0, (v, c) => v + c.length);
+  ClipItem? get active => clips.isEmpty ? null : clips[selected.clamp(0, clips.length - 1).toInt()];
   String quote(String s) => "'${s.replaceAll("'", "'\\''")}'";
   String stamp(double s) {
     final ms = (s * 1000).round().clamp(0, 1 << 31);
@@ -135,7 +135,7 @@ class _EditorPageState extends State<EditorPage> {
     if (i < 0 || i >= clips.length) return;
     checkpoint();
     clips.removeAt(i);
-    selected = clips.isEmpty ? 0 : selected.clamp(0, clips.length - 1);
+    selected = clips.isEmpty ? 0 : selected.clamp(0, clips.length - 1).toInt();
     if (clips.isEmpty) { player?.dispose(); player = null; }
     else { loadPreview(clips[selected]); }
     setState(() {});
@@ -145,7 +145,7 @@ class _EditorPageState extends State<EditorPage> {
     if (undoStack.isEmpty) { notify('Nothing to undo.'); return; }
     redoStack.add(clips.map((c) => c.copy()).toList());
     clips..clear()..addAll(undoStack.removeLast().map((c) => c.copy()));
-    selected = clips.isEmpty ? 0 : selected.clamp(0, clips.length - 1);
+    selected = clips.isEmpty ? 0 : selected.clamp(0, clips.length - 1).toInt();
     if (clips.isNotEmpty) loadPreview(clips[selected]);
     setState(() {});
   }
@@ -153,7 +153,7 @@ class _EditorPageState extends State<EditorPage> {
     if (redoStack.isEmpty) { notify('Nothing to redo.'); return; }
     undoStack.add(clips.map((c) => c.copy()).toList());
     clips..clear()..addAll(redoStack.removeLast().map((c) => c.copy()));
-    selected = clips.isEmpty ? 0 : selected.clamp(0, clips.length - 1);
+    selected = clips.isEmpty ? 0 : selected.clamp(0, clips.length - 1).toInt();
     if (clips.isNotEmpty) loadPreview(clips[selected]);
     setState(() {});
   }
