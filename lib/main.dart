@@ -56,6 +56,7 @@ class _EditorPageState extends State<EditorPage> {
   String aspect = '9:16';
   String filter = 'None';
   double musicVolume = .75, originalVolume = .85, speed = 1, fadeSeconds = .35;
+  double brightness = 0, contrast = 1, saturation = 1;
   bool busy = false;
   String status = 'Import videos to start editing';
   int selected = 0;
@@ -187,7 +188,8 @@ class _EditorPageState extends State<EditorPage> {
     final dir = await projectDir();
     final data = {'version': 2, 'clips': clips.map((c) => c.toJson()).toList(),
       'musicPath': musicPath, 'overlay': overlay, 'aspect': aspect, 'filter': filter,
-      'musicVolume': musicVolume, 'originalVolume': originalVolume, 'speed': speed, 'fadeSeconds': fadeSeconds, 'savedAt': DateTime.now().toIso8601String()};
+      'musicVolume': musicVolume, 'originalVolume': originalVolume, 'speed': speed, 'fadeSeconds': fadeSeconds,
+      'brightness': brightness, 'contrast': contrast, 'saturation': saturation, 'savedAt': DateTime.now().toIso8601String()};
     await File('${dir.path}/project.json').writeAsString(const JsonEncoder.withIndent('  ').convert(data));
     notify('Project saved offline on this device');
   }
@@ -208,6 +210,9 @@ class _EditorPageState extends State<EditorPage> {
       originalVolume = (data['originalVolume'] as num?)?.toDouble() ?? .85;
       speed = (data['speed'] as num?)?.toDouble() ?? 1;
       fadeSeconds = (data['fadeSeconds'] as num?)?.toDouble() ?? .35;
+      brightness = (data['brightness'] as num?)?.toDouble() ?? 0;
+      contrast = (data['contrast'] as num?)?.toDouble() ?? 1;
+      saturation = (data['saturation'] as num?)?.toDouble() ?? 1;
       selected = 0;
       if (clips.isNotEmpty && await File(clips.first.path).exists()) {
         await loadPreview(clips.first);
@@ -289,6 +294,7 @@ class _EditorPageState extends State<EditorPage> {
     if (filter == 'Grayscale') bits.add('hue=s=0');
     if (filter == 'Warm') bits.add('colorbalance=rs=.08:gs=.02:bs=-.04');
     if (filter == 'Vintage') bits.add('eq=saturation=.75:contrast=1.08:brightness=.02');
+    bits.add('eq=brightness=${brightness.toStringAsFixed(2)}:contrast=${contrast.toStringAsFixed(2)}:saturation=${saturation.toStringAsFixed(2)}');
     return bits.join(',');
   }
 
@@ -460,6 +466,18 @@ class _EditorPageState extends State<EditorPage> {
           Row(children: [const Icon(Icons.blur_on, size: 18), const SizedBox(width: 8), const Text('Fade in/out'),
             Expanded(child: Slider(value: fadeSeconds, min: 0, max: 2, divisions: 8, label: '${fadeSeconds.toStringAsFixed(2)}s', onChanged: (v) => setState(() => fadeSeconds = v))),
             Text('${fadeSeconds.toStringAsFixed(2)}s', style: const TextStyle(color: cyan)),
+          ]),
+          Row(children: [const Icon(Icons.light_mode_outlined, size: 18), const SizedBox(width: 8), const Text('Brightness'),
+            Expanded(child: Slider(value: brightness, min: -0.5, max: 0.5, divisions: 20, onChanged: (v) => setState(() => brightness = v))),
+            Text(brightness.toStringAsFixed(2), style: const TextStyle(color: cyan)),
+          ]),
+          Row(children: [const Icon(Icons.tonality, size: 18), const SizedBox(width: 8), const Text('Contrast'),
+            Expanded(child: Slider(value: contrast, min: 0.5, max: 1.8, divisions: 13, onChanged: (v) => setState(() => contrast = v))),
+            Text(contrast.toStringAsFixed(2), style: const TextStyle(color: cyan)),
+          ]),
+          Row(children: [const Icon(Icons.palette_outlined, size: 18), const SizedBox(width: 8), const Text('Saturation'),
+            Expanded(child: Slider(value: saturation, min: 0, max: 2, divisions: 20, onChanged: (v) => setState(() => saturation = v))),
+            Text(saturation.toStringAsFixed(2), style: const TextStyle(color: cyan)),
           ]),
           if (musicPath != null) Row(children: [const Icon(Icons.graphic_eq, size: 18), const SizedBox(width: 8),
             Expanded(child: Text(musicPath!.split(Platform.pathSeparator).last, maxLines: 1, overflow: TextOverflow.ellipsis)),
