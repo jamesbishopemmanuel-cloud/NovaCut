@@ -8,7 +8,10 @@ NovaCut is an offline-first Flutter video-editor prototype.
 - Export aspect ratios 9:16, 16:9, 1:1, and 4:5.
 - Grayscale, warm, and vintage filters; title/caption overlay.
 - Original-audio volume control, separate music selection, and configurable video/audio fade-in/fade-out.
-- MP4 export, sharing, and local JSON project save/load.
+- MP4 export, sharing, local JSON project save/load, and project-file import/export.
+
+## Project portability
+Project JSON stores edit settings and paths, not the media itself. Original video and audio files must remain accessible; opening a project on another device may require re-importing its media.
 
 ## QA and limitations
 Test on Android with media that does and does not contain audio. FFmpeg package compatibility, font availability, codecs, memory use, and export behavior still require verification. The project currently uses an ordered clip list, not a true multi-track timeline. Animated transitions, keyframes, stickers, picture-in-picture, chroma key, automatic captions, voice recording, waveform editing, and a rich effects library are not implemented. NovaCut is not yet a complete CapCut replacement.

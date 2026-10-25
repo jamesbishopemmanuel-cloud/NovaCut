@@ -219,6 +219,67 @@ class _EditorPageState extends State<EditorPage> {
     } catch (e) { notify('Could not load project: $e'); }
   }
 
+
+  Future<void> exportProjectFile() async {
+    try {
+      final data = {
+        'version': 3,
+        'clips': clips.map((c) => c.toJson()).toList(),
+        'musicPath': musicPath,
+        'overlay': overlay,
+        'aspect': aspect,
+        'filter': filter,
+        'musicVolume': musicVolume,
+        'originalVolume': originalVolume,
+        'speed': speed,
+        'fadeSeconds': fadeSeconds,
+        'savedAt': DateTime.now().toIso8601String(),
+      };
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Export NovaCut project',
+        fileName: 'NovaCut_project.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (path == null) { notify('Project export cancelled.'); return; }
+      await File(path).writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+      notify('Project JSON exported. Keep the original media files with it.');
+    } catch (e) { notify('Project export failed: $e'); }
+  }
+
+  Future<void> importProjectFile() async {
+    try {
+      final pick = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        allowMultiple: false,
+      );
+      final path = pick?.files.single.path;
+      if (path == null) return;
+      final data = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
+      final incoming = (data['clips'] as List)
+          .map((e) => ClipItem.fromJson(Map<String, dynamic>.from(e))).toList();
+      if (incoming.any((c) => !File(c.path).existsSync())) {
+        notify('Project opened, but source media paths are missing. Re-import the original files.');
+        return;
+      }
+      checkpoint();
+      clips..clear()..addAll(incoming);
+      musicPath = data['musicPath'] as String?;
+      overlay = data['overlay'] as String? ?? '';
+      aspect = data['aspect'] as String? ?? '9:16';
+      filter = data['filter'] as String? ?? 'None';
+      musicVolume = (data['musicVolume'] as num?)?.toDouble() ?? .75;
+      originalVolume = (data['originalVolume'] as num?)?.toDouble() ?? .85;
+      speed = (data['speed'] as num?)?.toDouble() ?? 1;
+      fadeSeconds = (data['fadeSeconds'] as num?)?.toDouble() ?? .35;
+      selected = 0;
+      if (clips.isNotEmpty) await loadPreview(clips.first);
+      if (mounted) setState(() {});
+      notify('Project imported');
+    } catch (e) { notify('Could not import project: $e'); }
+  }
+
   String videoFilter() {
     final dimensions = switch (aspect) {
       '16:9' => '1920:1080', '1:1' => '1080:1080', '4:5' => '1080:1350', _ => '1080:1920'
@@ -345,6 +406,8 @@ class _EditorPageState extends State<EditorPage> {
           action('Delete', Icons.delete_outline, () => removeClip(selected), disabled: current == null),
           action('Music', Icons.music_note, pickMusic),
           action('Caption', Icons.title, editCaption),
+          action('Import Project', Icons.file_open, importProjectFile),
+          action('Export Project', Icons.save_alt, exportProjectFile),
           action('Export MP4', Icons.ios_share, export, disabled: busy || clips.isEmpty),
         ])),
         Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 2), child: Row(children: [
