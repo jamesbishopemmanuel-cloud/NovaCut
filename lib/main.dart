@@ -94,6 +94,7 @@ class _EditorHomeState extends State<EditorHome> {
         _loading = false;
       });
       next.addListener(_onVideoTick);
+      old?.removeListener(_onVideoTick);
       await old?.dispose();
     } catch (error) {
       if (!mounted) return;
@@ -163,7 +164,7 @@ class _EditorHomeState extends State<EditorHome> {
     final v = _video;
     final initialized = v != null && v.value.isInitialized;
     final duration = initialized ? _durationSeconds : 1.0;
-    final playhead = _playheadSeconds.clamp(0.0, duration);
+    final playhead = _playheadSeconds.clamp(0.0, duration).toDouble();
 
     return Scaffold(
       appBar: AppBar(
@@ -374,8 +375,8 @@ class _EditorHomeState extends State<EditorHome> {
                 ]),
                 RangeSlider(
                   values: RangeValues(
-                    _trimStart.clamp(0.0, duration),
-                    _trimEnd.clamp(0.0, duration),
+                    _trimStart.clamp(0.0, duration).toDouble(),
+                    _trimEnd.clamp(0.0, duration).toDouble(),
                   ),
                   min: 0,
                   max: duration,
