@@ -313,8 +313,11 @@ class _EditorPageState extends State<EditorPage> {
         final vf = videoFilter() + fades;
         final caption = overlay.trim().isEmpty ? '' :
           ",drawtext=fontfile=/system/fonts/Roboto-Regular.ttf:text='${overlay.replaceAll('\\', '\\\\').replaceAll(':', '\\:').replaceAll("'", "\\'").replaceAll('%', '\\%').replaceAll(',', '\\,')}':fontcolor=white:fontsize=48:box=1:boxcolor=black@0.55:boxborderw=16:x=(w-text_w)/2:y=h-text_h-100";
+        final baseAudio = 'atempo=${speed.clamp(.5, 2).toStringAsFixed(2)},volume=${originalVolume.toStringAsFixed(2)}';
+        final audioFilters = fd <= 0 ? baseAudio :
+          '$baseAudio,afade=t=in:st=0:d=${fd.toStringAsFixed(2)},afade=t=out:st=${(c.length-fd).clamp(0.0,c.length).toStringAsFixed(2)}:d=${fd.toStringAsFixed(2)}';
         final command = '-y -ss ${c.start.toStringAsFixed(3)} -i ${quote(c.path)} -t ${c.length.toStringAsFixed(3)} '
-          '-vf ${quote(vf + caption)} -filter:a "atempo=${speed.clamp(.5, 2).toStringAsFixed(2)},volume=${originalVolume.toStringAsFixed(2)},afade=t=in:st=0:d=${fd.toStringAsFixed(2)},afade=t=out:st=${(c.length-fd).clamp(0.0,c.length).toStringAsFixed(2)}:d=${fd.toStringAsFixed(2)}" '
+          '-vf ${quote(vf + caption)} -filter:a ${quote(audioFilters)} '
           '-c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -c:a aac -b:a 160k -ar 44100 -ac 2 '
           '-avoid_negative_ts make_zero -movflags +faststart ${quote(out)}';
         final session = await FFmpegKit.execute(command);
