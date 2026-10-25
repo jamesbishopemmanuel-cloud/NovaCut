@@ -56,8 +56,11 @@ class _EditorHomeState extends State<EditorHome> {
   @override
   void dispose() { video?.dispose(); super.dispose(); }
 
-  String durationLabel(Duration d) =>
-      '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+  String durationLabel(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 
   @override
   Widget build(BuildContext context) {
