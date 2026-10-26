@@ -200,7 +200,7 @@ class _EditorPageState extends State<EditorPage> {
     }
     final item = TimelineItem(id: DateTime.now().microsecondsSinceEpoch.toString(), kind: kind,
       label: kind == TrackKind.video ? 'Overlay video' : kind == TrackKind.audio ? 'Audio layer' : kind == TrackKind.sticker ? 'Sticker $sticker' : 'Caption',
-      path: path, start: player?.value.position.inMilliseconds.toDouble().toDouble().toDouble() ?? 0, duration: 3);
+      path: path, start: (player?.value.position.inMilliseconds ?? 0) / 1000.0, duration: 3);
     setState(() => layerItems.add(item));
     notify('${kind.name} layer added; adjust its timing in the multi-track lane.');
   }
@@ -492,9 +492,9 @@ class _EditorPageState extends State<EditorPage> {
         ])),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Wrap(spacing: 6, runSpacing: 6, children: [
           action('Video layer', Icons.video_collection, () => addTimelineLayer(TrackKind.video)),
-          action('Audio layer', Icons.multitrack_audio, () => addTimelineLayer(TrackKind.audio)),
+          action('Audio layer', Icons.graphic_eq, () => addTimelineLayer(TrackKind.audio)),
           action('Sticker', Icons.emoji_emotions_outlined, chooseSticker),
-          action('Keyframe', Icons.keyframe, addKeyframe),
+          action('Keyframe', Icons.animation, addKeyframe),
           action('Chroma key', Icons.colorize, () => setState(() { chromaKeyEnabled = !chromaKeyEnabled; notify(chromaKeyEnabled ? 'Green-screen chroma key enabled for export.' : 'Chroma key disabled.'); })),
         ])),
         if (layerItems.isNotEmpty || keyframes.isNotEmpty) Container(
