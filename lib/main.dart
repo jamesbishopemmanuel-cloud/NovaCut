@@ -364,6 +364,11 @@ class _EditorPageState extends State<EditorPage> {
     if (filter == 'Grayscale') bits.add('hue=s=0');
     if (filter == 'Warm') bits.add('colorbalance=rs=.08:gs=.02:bs=-.04');
     if (filter == 'Vintage') bits.add('eq=saturation=.75:contrast=1.08:brightness=.02');
+    if (filter == 'Cinematic') bits.add('eq=saturation=1.15:contrast=1.18:brightness=-.02,colorbalance=rs=.04:bs=-.06');
+    if (filter == 'Cool') bits.add('colorbalance=rs=-.04:bs=.08');
+    if (filter == 'Invert') bits.add('negate');
+    if (filter == 'Sharpen') bits.add('unsharp=5:5:0.8:3:3:0.4');
+    if (filter == 'Soft blur') bits.add('gblur=sigma=1.2');
     if (chromaKeyEnabled) bits.add('chromakey=0x00FF00:${chromaSimilarity.toStringAsFixed(2)}:0.08');
     bits.add('eq=brightness=${brightness.toStringAsFixed(2)}:contrast=${contrast.toStringAsFixed(2)}:saturation=${saturation.toStringAsFixed(2)}');
     return bits.join(',');
@@ -385,7 +390,7 @@ class _EditorPageState extends State<EditorPage> {
       for (var i = 0; i < clips.length; i++) {
         final c = clips[i];
         final out = '${work.path}/segment_${i.toString().padLeft(3, '0')}.mp4';
-        final fd = fadeSeconds.clamp(0.0, c.length / 2).toDouble();
+        final fd = (transition == 'Cut' ? fadeSeconds : (transition == 'Fade' ? fadeSeconds.clamp(.25, 2.0) : fadeSeconds.clamp(.25, 1.0))).clamp(0.0, c.length / 2).toDouble();
         final fades = fd <= 0 ? '' : ',fade=t=in:st=0:d=$fd,fade=t=out:st=${(c.length - fd).clamp(0.0, c.length)}:d=$fd';
         final vf = videoFilter() + fades;
         final caption = overlay.trim().isEmpty ? '' :
@@ -546,7 +551,7 @@ class _EditorPageState extends State<EditorPage> {
               onChanged: (v) => setState(() => aspect = v ?? aspect)),
             const SizedBox(width: 16), const Text('Filter'), const SizedBox(width: 8),
             Expanded(child: DropdownButton<String>(isExpanded: true, value: filter,
-              items: const ['None','Grayscale','Warm','Vintage'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+              items: const ['None','Grayscale','Warm','Vintage','Cinematic','Cool','Invert','Sharpen','Soft blur'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
               onChanged: (v) => setState(() => filter = v ?? filter))),
           ]),
           if (current != null && ready) Row(children: [
