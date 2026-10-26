@@ -18,13 +18,14 @@ const _studioPurple = Color(0xFF7C5CFF);
 const _studioCyan = Color(0xFF39D8E8);
 
 class MusicTrack {
-  MusicTrack({required this.path, required this.kind, double gain = 0.8, bool muted = false, this.kieTaskId, this.kieAudioId})
+  MusicTrack({required this.path, required this.kind, double gain = 0.8, bool muted = false, this.offsetSeconds = 0, this.kieTaskId, this.kieAudioId})
       : gain = gain, muted = muted, id = DateTime.now().microsecondsSinceEpoch.toString();
   final String id;
   final String path;
   String kind;
   double gain;
   bool muted;
+  double offsetSeconds;
   final String? kieTaskId;
   final String? kieAudioId;
   String get name => path.split(Platform.pathSeparator).last;
@@ -73,26 +74,24 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     }
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 25);
     try {
-      final uri = Uri.parse('${_supabaseUrl.replaceAll(RegExp(r'/+
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
-        allowMultiple: true,
-        withData: false,
-      );
-      if (result == null) return;
-      final paths = result.files.map((f) => f.path).whereType<String>()
-          .where((p) => File(p).existsSync()).toList();
-      if (paths.isEmpty) {
-        message('No readable audio files were selected.');
-        return;
+      final base = _supabaseUrl.replaceAll(RegExp(r'/+$'), '');
+      final uri = Uri.parse('$base/functions/v1/kie-music');
+      final request = await client.postUrl(uri);
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set('apikey', _supabaseKey);
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_supabaseKey');
+      request.write(jsonEncode(body));
+      final response = await request.close();
+      final textBody = await response.transform(utf8.decoder).join();
+      final decoded = textBody.isEmpty ? <String, dynamic>{} : jsonDecode(textBody);
+      if (decoded is! Map) throw Exception('KIE backend returned an invalid response (HTTP ${response.statusCode}).');
+      final result = Map<String, dynamic>.from(decoded);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(result['error']?.toString() ?? result['message']?.toString() ?? 'KIE backend failed (HTTP ${response.statusCode}).');
       }
-      setState(() {
-        tracks.addAll(paths.map((p) => MusicTrack(path: p, kind: kind)));
-        status = '${paths.length} ${kind.toLowerCase()} track(s) added.';
-      });
-    } catch (e) {
-      message('Could not import audio: $e');
+      return result;
+    } finally {
+      client.close(force: true);
     }
   }
 
@@ -194,7 +193,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       }
       final filters = <String>[];
       for (var i = 0; i < active.length; i++) {
-        filters.add('[$i:a]volume=${active[i].gain.toStringAsFixed(3)}[a$i]');
+        final delayMs = (active[i].offsetSeconds * 1000).round();
+        filters.add('[$i:a]adelay=$delayMs|$delayMs,volume=${active[i].gain.toStringAsFixed(3)}[a$i]');
       }
       final labels = List.generate(active.length, (i) => '[a$i]').join();
       final fx = effect == 'Echo' ? ',aecho=0.8:0.75:70:0.25' : effect == 'Reverb' ? ',aecho=0.8:0.9:80|160:0.25|0.15' : effect == 'Warmth' ? ',equalizer=f=180:t=q:w=1:g=2,equalizer=f=7000:t=q:w=1:g=-1.5' : effect == 'Bass' ? ',equalizer=f=100:t=q:w=1:g=4' : effect == 'Bright' ? ',equalizer=f=6000:t=q:w=1:g=3' : effect == 'Compressor' ? ',acompressor=threshold=0.125:ratio=3:attack=20:release=250' : effect == 'Normalize' ? ',loudnorm=I=-16:TP=-1.5:LRA=11' : '';
@@ -220,7 +220,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     try {
       final data = {
         'version': 1, 'bpm': bpm, 'masterGain': masterGain, 'effect': effect,
-        'tracks': tracks.map((t) => {'path': t.path, 'kind': t.kind, 'gain': t.gain, 'muted': t.muted, 'kieTaskId': t.kieTaskId, 'kieAudioId': t.kieAudioId}).toList(),
+        'tracks': tracks.map((t) => {'path': t.path, 'kind': t.kind, 'gain': t.gain, 'muted': t.muted, 'offsetSeconds': t.offsetSeconds, 'kieTaskId': t.kieTaskId, 'kieAudioId': t.kieAudioId}).toList(),
       };
       final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save Music Studio session', fileName: 'NovaCut_music_session.json',
@@ -240,7 +240,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       final incoming = (data['tracks'] as List).map((raw) {
         final item = Map<String, dynamic>.from(raw);
         return MusicTrack(path: item['path'] as String, kind: item['kind'] as String,
-          gain: (item['gain'] as num?)?.toDouble() ?? .8, muted: item['muted'] as bool? ?? false, kieTaskId: item['kieTaskId'] as String?, kieAudioId: item['kieAudioId'] as String?);
+          gain: (item['gain'] as num?)?.toDouble() ?? .8, muted: item['muted'] as bool? ?? false, offsetSeconds: (item['offsetSeconds'] as num?)?.toDouble() ?? 0, kieTaskId: item['kieTaskId'] as String?, kieAudioId: item['kieAudioId'] as String?);
       }).where((t) => File(t.path).existsSync()).toList();
       setState(() {
         tracks..clear()..addAll(incoming);
@@ -712,7 +712,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       final incoming = (data['tracks'] as List).map((raw) {
         final item = Map<String, dynamic>.from(raw);
         return MusicTrack(path: item['path'] as String, kind: item['kind'] as String,
-          gain: (item['gain'] as num?)?.toDouble() ?? .8, muted: item['muted'] as bool? ?? false);
+          gain: (item['gain'] as num?)?.toDouble() ?? .8, muted: item['muted'] as bool? ?? false, offsetSeconds: (item['offsetSeconds'] as num?)?.toDouble() ?? 0);
       }).where((t) => File(t.path).existsSync()).toList();
       setState(() {
         tracks..clear()..addAll(incoming);
