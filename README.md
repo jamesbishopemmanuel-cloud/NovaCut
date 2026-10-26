@@ -10,12 +10,13 @@ NovaCut is an original Flutter-based, CapCut-inspired Android editor with its ow
 - Add a text overlay to preview and exported video.
 - Import an audio file and mix it with the source video's audio.
 - Apply fade-in/fade-out to the exported clip.
+- Choose export color looks: Original, Warm, Black & white, Vintage and Cool; the selected look is saved with the offline project.
 - Save/load project settings and local media paths as an offline JSON project.
 - Share an exported MP4 through the Android share sheet.
 - GitHub Actions workflow builds an Android APK.
 
 ## Limitations and release notes
-- This is an early single-video editor, not a full CapCut replacement. Multi-clip timelines, transitions between clips, keyframes, filters, captions and undo/redo are not implemented.
+- This is still an early single-video editor, not a full CapCut replacement. It has basic export color looks, but multi-clip timelines, transitions between clips, keyframes, automatic captions and undo/redo are not implemented. Playback speed currently affects preview; exported speed changes still need implementation and testing.
 - Music mixing expects the source video to contain an audio stream. Some input codecs may fail on some devices.
 - Project files store local media paths. Moving/deleting the original media can make it unavailable when reopening the project.
 - Export runs on-device and may take time; keep enough free storage.
