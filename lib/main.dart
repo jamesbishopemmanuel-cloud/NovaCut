@@ -5,9 +5,17 @@ import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 
-void main() => runApp(const NovaCutApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://vihbsfrwnslnmheowkhy.supabase.co',
+    anonKey: 'sb_publishable_HIMGxb-O6fj9O7OzT4ukuQ_jm5W8mWz',
+  );
+  runApp(const NovaCutApp());
+}
 const bg = Color(0xFF090B12);
 const panel = Color(0xFF151925);
 const purple = Color(0xFF7C5CFF);
@@ -273,6 +281,7 @@ class _EditorHomeState extends State<EditorHome> {
         backgroundColor: bg,
         title: const Row(children: [Icon(Icons.cut_rounded, color: cyan), SizedBox(width: 8), Text('NovaCut', style: TextStyle(fontWeight: FontWeight.w800))]),
         actions: [
+          IconButton(tooltip: 'AI Tools', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiToolsPage())), icon: const Icon(Icons.auto_awesome, color: cyan)),
           IconButton(tooltip: 'Project settings', onPressed: projectMenu, icon: const Icon(Icons.tune_rounded)),
           Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: busy ? null : exportMp4, icon: const Icon(Icons.ios_share_rounded, size: 18), label: Text(busy ? 'Working…' : 'Export MP4')))
         ]),
@@ -334,6 +343,196 @@ class _EditorHomeState extends State<EditorHome> {
           if (lastExport != null) Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: shareExport, icon: const Icon(Icons.share, size: 16), label: const Text('Share MP4')))
         ]))
       ]))
+    );
+  }
+}
+
+
+class AiToolsPage extends StatefulWidget {
+  const AiToolsPage({super.key});
+  @override
+  State<AiToolsPage> createState() => _AiToolsPageState();
+}
+
+class _AiToolsPageState extends State<AiToolsPage> {
+  final promptController = TextEditingController();
+  final modelController = TextEditingController();
+  final inputJsonController = TextEditingController(text: '{"prompt": ""}');
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  int selectedType = 0;
+  bool creatingAccount = false, busy = false;
+  List<Map<String, dynamic>> history = [];
+  static const types = ['Image', 'Video', 'Music'];
+  static const typeIcons = [Icons.image_outlined, Icons.movie_creation_outlined, Icons.music_note_outlined];
+  SupabaseClient get client => Supabase.instance.client;
+
+  @override
+  void initState() { super.initState(); loadHistory(); }
+  @override
+  void dispose() {
+    promptController.dispose(); modelController.dispose(); inputJsonController.dispose();
+    emailController.dispose(); passwordController.dispose(); super.dispose();
+  }
+
+  Future<File> historyFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final folder = Directory('${dir.path}/NovaCut');
+    if (!await folder.exists()) await folder.create(recursive: true);
+    return File('${folder.path}/ai_generation_history.json');
+  }
+
+  Future<void> loadHistory() async {
+    try {
+      final file = await historyFile();
+      if (await file.exists()) {
+        final decoded = jsonDecode(await file.readAsString()) as List;
+        if (mounted) setState(() => history = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> saveHistory() async {
+    final file = await historyFile();
+    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(history));
+  }
+
+  void showMessage(String text) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> authenticate() async {
+    if (emailController.text.trim().isEmpty || passwordController.text.length < 6) {
+      showMessage('Enter your email and a password of at least 6 characters.'); return;
+    }
+    setState(() => busy = true);
+    try {
+      if (creatingAccount) {
+        final result = await client.auth.signUp(email: emailController.text.trim(), password: passwordController.text);
+        if (result.session == null) showMessage('Account request sent. Check your email to confirm, then sign in.');
+        else showMessage('Signed in successfully.');
+      } else {
+        await client.auth.signInWithPassword(email: emailController.text.trim(), password: passwordController.text);
+        showMessage('Signed in successfully.');
+      }
+      if (mounted) setState(() {});
+    } on AuthException catch (e) {
+      showMessage(e.message);
+    } catch (e) {
+      showMessage('Authentication failed: $e');
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  Future<void> generate() async {
+    final session = client.auth.currentSession;
+    if (session == null) { showMessage('Sign in or create a NovaCut account before generating.'); return; }
+    final model = modelController.text.trim();
+    if (model.isEmpty) { showMessage('Enter the exact KIE model ID for this tool.'); return; }
+    Map<String, dynamic> input;
+    try {
+      input = jsonDecode(inputJsonController.text) as Map<String, dynamic>;
+    } catch (_) {
+      showMessage('Input parameters must be a valid JSON object.'); return;
+    }
+    if (promptController.text.trim().isNotEmpty) input['prompt'] = promptController.text.trim();
+    setState(() => busy = true);
+    try {
+      final response = await client.functions.invoke('kie-ai', body: {
+        'action': 'create', 'model': model, 'input': input,
+      });
+      final data = response.data;
+      if (response.status < 200 || response.status >= 300 || data is! Map) {
+        throw Exception('KIE request failed (HTTP ${response.status}): $data');
+      }
+      final payload = data['data'] is Map ? Map<String, dynamic>.from(data['data']) : Map<String, dynamic>.from(data);
+      final taskId = payload['taskId']?.toString() ?? payload['task_id']?.toString() ?? '';
+      final item = <String, dynamic>{
+        'type': types[selectedType], 'model': model, 'prompt': promptController.text.trim(),
+        'taskId': taskId, 'status': 'Submitted', 'response': data.toString(),
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      setState(() => history.insert(0, item));
+      await saveHistory();
+      showMessage(taskId.isEmpty ? 'Request submitted. Check KIE response in history.' : 'Generation task submitted.');
+    } on FunctionException catch (e) {
+      showMessage('AI request failed: ${e.details ?? e.reasonPhrase ?? e.toString()}');
+    } catch (e) {
+      showMessage('AI request failed: $e');
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  Future<void> checkStatus(int index) async {
+    final taskId = history[index]['taskId']?.toString() ?? '';
+    if (taskId.isEmpty) { showMessage('This history entry has no task ID.'); return; }
+    if (client.auth.currentSession == null) { showMessage('Sign in to check task status.'); return; }
+    setState(() => busy = true);
+    try {
+      final response = await client.functions.invoke('kie-ai', body: {'action': 'status', 'taskId': taskId});
+      if (response.status < 200 || response.status >= 300) throw Exception('HTTP ${response.status}: ${response.data}');
+      setState(() {
+        history[index]['status'] = 'Status checked';
+        history[index]['response'] = response.data.toString();
+        history[index]['checkedAt'] = DateTime.now().toIso8601String();
+      });
+      await saveHistory();
+      showMessage('Latest provider response saved to history.');
+    } catch (e) {
+      showMessage('Could not check status: $e');
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = client.auth.currentSession;
+    return Scaffold(
+      appBar: AppBar(title: const Row(children: [Icon(Icons.auto_awesome, color: cyan), SizedBox(width: 8), Text('AI Tools')])),
+      body: SafeArea(child: ListView(padding: const EdgeInsets.all(16), children: [
+        Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF25214C), Color(0xFF102A37)]),
+          borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white12)),
+          child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Create with AI', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800)),
+            SizedBox(height: 5), Text('Generate images, videos and music with KIE. Your task history is saved on this device.', style: TextStyle(color: Colors.white70))
+          ])),
+        const SizedBox(height: 16),
+        SegmentedButton<int>(segments: const [
+          ButtonSegment(value: 0, label: Text('Image'), icon: Icon(Icons.image_outlined)),
+          ButtonSegment(value: 1, label: Text('Video'), icon: Icon(Icons.movie_outlined)),
+          ButtonSegment(value: 2, label: Text('Music'), icon: Icon(Icons.music_note_outlined)),
+        ], selected: {selectedType}, onSelectionChanged: (v) => setState(() => selectedType = v.first)),
+        const SizedBox(height: 12),
+        TextField(controller: modelController, decoration: const InputDecoration(labelText: 'KIE model ID', hintText: 'Enter the exact model ID from KIE', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: promptController, minLines: 2, maxLines: 5, decoration: const InputDecoration(labelText: 'Prompt', hintText: 'Describe what you want to create', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: inputJsonController, minLines: 2, maxLines: 5, decoration: const InputDecoration(labelText: 'Model input parameters (JSON)', helperText: 'Use the exact fields required by your selected KIE model.', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        if (session == null) ...[
+          Text('Sign in to use AI', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TextField(controller: emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder())),
+          const SizedBox(height: 8),
+          TextField(controller: passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'Password (minimum 6 characters)', border: OutlineInputBorder())),
+          SwitchListTile(contentPadding: EdgeInsets.zero, value: creatingAccount, onChanged: (v) => setState(() => creatingAccount = v), title: Text(creatingAccount ? 'Create a new account' : 'I already have an account')),
+          FilledButton(onPressed: busy ? null : authenticate, child: Text(busy ? 'Please wait…' : creatingAccount ? 'Create account' : 'Sign in')),
+        ] else ...[
+          Row(children: [const Icon(Icons.verified_user, color: cyan), const SizedBox(width: 8), Expanded(child: Text(session.user.email ?? 'Signed in')), TextButton(onPressed: () async { await client.auth.signOut(); setState(() {}); }, child: const Text('Sign out'))]),
+          FilledButton.icon(onPressed: busy ? null : generate, icon: const Icon(Icons.auto_awesome), label: Text(busy ? 'Working…' : 'Generate ${types[selectedType]}'), style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50))),
+        ],
+        const SizedBox(height: 24),
+        Row(children: [const Expanded(child: Text('Generation history', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800))), Text('${history.length} saved')]),
+        const SizedBox(height: 8),
+        if (history.isEmpty) Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(14)), child: const Column(children: [Icon(Icons.history, size: 32, color: cyan), SizedBox(height: 8), Text('Your AI requests will appear here'), Text('History is stored locally on this device.', style: TextStyle(color: Colors.white60))]))
+        else ...history.asMap().entries.map((entry) {
+          final i = entry.key; final item = entry.value;
+          return Card(color: panel, child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [Icon(item['type'] == 'Image' ? Icons.image : item['type'] == 'Video' ? Icons.movie : Icons.music_note, color: cyan), const SizedBox(width: 8), Expanded(child: Text('${item['type']} • ${item['model'] ?? 'KIE'}', style: const TextStyle(fontWeight: FontWeight.bold))), Text(item['status']?.toString() ?? 'Submitted', style: const TextStyle(color: cyan, fontSize: 11))]),
+            const SizedBox(height: 6), Text(item['prompt']?.toString().isNotEmpty == true ? item['prompt'].toString() : 'No prompt text', maxLines: 3, overflow: TextOverflow.ellipsis),
+            if ((item['taskId']?.toString() ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Task: ${item['taskId']}', style: const TextStyle(color: Colors.white54, fontSize: 11))),
+            Row(children: [TextButton.icon(onPressed: busy ? null : () => checkStatus(i), icon: const Icon(Icons.refresh, size: 16), label: const Text('Check status')), const Spacer(), IconButton(onPressed: () async { setState(() => history.removeAt(i)); await saveHistory(); }, icon: const Icon(Icons.delete_outline))])
+          ])));
+        }),
+      ])),
     );
   }
 }
