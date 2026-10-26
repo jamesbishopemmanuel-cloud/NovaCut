@@ -47,3 +47,10 @@ For Android vocal recording, ensure the app manifest includes `android.permissio
 ## Before release
 
 The repository's Android workflow generates the Android platform scaffold during CI; Android platform files are not currently committed. The CI workflow must pass before treating this as a buildable APK. Verify microphone permission and runtime behavior on a physical device. The track waveform remains a visual guide rather than a sample-accurate waveform, and start offsets affect the rendered mix rather than providing a low-latency live DAW playback engine. Add authenticated user-level quotas/rate limiting to the Edge Function before public launch; keep `KIE_API_KEY` exclusively in Supabase Function secrets.
+
+
+## Android APK size optimization
+
+The Android CI workflow now builds ABI-specific release APKs (`armeabi-v7a`, `arm64-v8a`, and `x86_64`) instead of relying only on a universal APK, applies Dart obfuscation with separate symbol files, reports each APK's actual size, and creates an Android App Bundle for Play Store delivery. Download the generated artifacts from GitHub Actions after the workflow succeeds.
+
+A strict 4 MB installable APK is not a realistic target for this Flutter app while it includes Flutter runtime, FFmpeg-based video processing, audio recording, and media playback plugins. ABI splitting avoids bundling every CPU architecture into each APK and is the safe first optimization; actual size must be measured by CI. Do not remove FFmpeg or core editor features solely to hit a number without agreeing to those feature trade-offs.
