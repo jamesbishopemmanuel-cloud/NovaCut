@@ -23,18 +23,21 @@ serve(async (req: Request) => {
       const prompt = String(body.prompt ?? "").trim();
       if (!prompt) return json({ error: "Song description or lyrics are required." }, 400);
       const instrumental = body.instrumental === true;
+      const title = String(body.title ?? "NovaCut Song").trim().slice(0, 80) || "NovaCut Song";
+      const style = String(body.style ?? "").trim().slice(0, 1000);
+      if (!style) return json({ error: "Music style is required." }, 400);
       payload = {
         model: "ai-music-api/generate",
         input: {
-          custom_mode: false,
+          custom_mode: true,
           instrumental,
           model: "V6",
-          prompt: prompt.slice(0, 3000),
-          ...(instrumental ? {} : {}),
+          title,
+          style,
+          ...(instrumental ? {} : { prompt: prompt.slice(0, 5000) }),
         },
       };
-      // Non-custom mode uses prompt for the song request. Title/style are intentionally
-      // not sent in this mode because KIE says other parameters should be left empty.
+      // Instrumental mode sends only title/style; vocal mode also sends the prompt as lyrics.
       url = "https://api.kie.ai/api/v1/jobs/createTask";
     } else if (action === "status") {
       const taskId = String(body.taskId ?? "").trim();
