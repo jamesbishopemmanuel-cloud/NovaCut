@@ -109,13 +109,15 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
   Future<void> stopRecording() async {
     try {
       final path = await recorder.stop();
-      if (mounted) setState(() {
-        recording = false;
-        if (path != null && File(path).existsSync()) {
-          tracks.add(MusicTrack(path: path, kind: 'Vocals'));
-        }
-        status = path == null ? 'Recording stopped.' : 'Vocal recording added to your tracks.';
-      });
+      if (mounted) {
+        setState(() {
+          recording = false;
+          if (path != null && File(path).existsSync()) {
+            tracks.add(MusicTrack(path: path, kind: 'Vocals'));
+          }
+          status = path == null ? 'Recording stopped.' : 'Vocal recording added to your tracks.';
+        });
+      }
     } catch (e) { message('Could not save recording: $e'); }
   }
 
