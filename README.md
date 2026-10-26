@@ -35,3 +35,15 @@ This integration keeps the KIE secret out of the mobile app. For production, add
 The Music Studio now includes microphone vocal recording (via the `record` package), per-track audio preview (via `just_audio`), waveform-style visual lanes, a 16-step synthesized drum sequencer that creates a local WAV loop at the selected BPM, audio section cutting, per-track gain/mute/reordering, and MP3 mixing with Echo, Reverb, Warmth, Bass, Bright, Compressor, or Normalize processing. The waveform display is a visual guide, not a decoded sample-accurate waveform; audio preview is per-track and is not synchronized multi-track playback. The drum maker uses synthesized sounds rather than a bundled sample library.
 
 For Android vocal recording, ensure the app manifest includes `android.permission.RECORD_AUDIO` and test the runtime microphone permission on-device. The KIE integration still requires deploying the Supabase Edge Function and setting `KIE_API_KEY` as a server secret; KIE request/response compatibility, stem separation, Flutter dependency resolution, and Android build must be tested before release. No API secret should be committed to the repository.
+
+
+## Music Studio: recent implementation notes
+
+- Repaired the mobile request wrapper for the Supabase `kie-music` Edge Function. It sends JSON plus the Supabase `apikey` and bearer headers and surfaces backend error messages.
+- Added per-track start offsets (0–120 seconds). The mixer applies these offsets when rendering, so tracks can be arranged relative to each other in the exported mix.
+- Added WAV PCM 16-bit / 44.1 kHz export alongside MP3. Export still uses the installed FFmpeg package and must be exercised on a real Android build.
+- Session JSON now persists track offsets and export format; older sessions without those fields load with defaults.
+
+## Before release
+
+The repository's Android workflow generates the Android platform scaffold during CI; Android platform files are not currently committed. The CI workflow must pass before treating this as a buildable APK. Verify microphone permission and runtime behavior on a physical device. The track waveform remains a visual guide rather than a sample-accurate waveform, and start offsets affect the rendered mix rather than providing a low-latency live DAW playback engine. Add authenticated user-level quotas/rate limiting to the Edge Function before public launch; keep `KIE_API_KEY` exclusively in Supabase Function secrets.
