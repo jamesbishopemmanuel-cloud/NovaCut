@@ -20,6 +20,8 @@ jobs:
           cache: true
       - name: Generate Android platform files
         run: flutter create --platforms=android --project-name novacut .
+      - name: Remove generated placeholder test for nonexistent MyApp
+        run: rm -f test/widget_test.dart
       - name: Set Android minimum SDK for FFmpeg
         run: |
           python3 - <<'PY'
