@@ -55,6 +55,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
   String? lastKieAudioId;
   List<Map<String, dynamic>> generatedVersions = [];
   double masterGain = 1.0;
+  String exportFormat = 'MP3';
   int bpm = 110;
   String effect = 'None';
   String status = 'Import audio, vocals, or beats to start your session.';
@@ -186,7 +187,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     setState(() { exporting = true; status = 'Mixing ${active.length} tracks…'; });
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final output = '${dir.path}/NovaCut_Mix_${DateTime.now().millisecondsSinceEpoch}.mp3';
+      final extension = exportFormat.toLowerCase();
+      final output = '${dir.path}/NovaCut_Mix_${DateTime.now().millisecondsSinceEpoch}.$extension';
       final inputs = <String>[];
       for (final track in active) {
         inputs.add('-i ${quote(track.path)}');
@@ -199,8 +201,9 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       final labels = List.generate(active.length, (i) => '[a$i]').join();
       final fx = effect == 'Echo' ? ',aecho=0.8:0.75:70:0.25' : effect == 'Reverb' ? ',aecho=0.8:0.9:80|160:0.25|0.15' : effect == 'Warmth' ? ',equalizer=f=180:t=q:w=1:g=2,equalizer=f=7000:t=q:w=1:g=-1.5' : effect == 'Bass' ? ',equalizer=f=100:t=q:w=1:g=4' : effect == 'Bright' ? ',equalizer=f=6000:t=q:w=1:g=3' : effect == 'Compressor' ? ',acompressor=threshold=0.125:ratio=3:attack=20:release=250' : effect == 'Normalize' ? ',loudnorm=I=-16:TP=-1.5:LRA=11' : '';
       filters.add('${labels}amix=inputs=${active.length}:duration=longest:dropout_transition=0:normalize=0,volume=${masterGain.toStringAsFixed(3)}$fx[aout]');
+      final codecArgs = exportFormat == 'WAV' ? '-c:a pcm_s16le -ar 44100' : '-c:a libmp3lame -b:a 192k -ar 44100';
       final command = '-y ${inputs.join(' ')} -filter_complex "${filters.join(';')}" '
-          '-map "[aout]" -c:a libmp3lame -b:a 192k -ar 44100 ${quote(output)}';
+          '-map "[aout]" $codecArgs ${quote(output)}';
       final session = await FFmpegKit.execute(command);
       final code = await session.getReturnCode();
       if (code == null || code.getValue() != 0 || !File(output).existsSync()) {
@@ -219,7 +222,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
   Future<void> saveSession() async {
     try {
       final data = {
-        'version': 1, 'bpm': bpm, 'masterGain': masterGain, 'effect': effect,
+        'version': 2, 'bpm': bpm, 'masterGain': masterGain, 'effect': effect, 'exportFormat': exportFormat,
         'tracks': tracks.map((t) => {'path': t.path, 'kind': t.kind, 'gain': t.gain, 'muted': t.muted, 'offsetSeconds': t.offsetSeconds, 'kieTaskId': t.kieTaskId, 'kieAudioId': t.kieAudioId}).toList(),
       };
       final path = await FilePicker.platform.saveFile(
@@ -247,6 +250,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
         bpm = (data['bpm'] as num?)?.toInt() ?? 110;
         masterGain = (data['masterGain'] as num?)?.toDouble() ?? 1;
         effect = data['effect'] as String? ?? 'None';
+        exportFormat = data['exportFormat'] as String? ?? 'MP3';
         status = 'Session loaded: ${tracks.length} available tracks.';
       });
     } catch (e) { message('Could not load session: $e'); }
@@ -419,6 +423,17 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                               SizedBox(width: 46, child: Text('${(track.gain * 100).round()}%', textAlign: TextAlign.end,
                                 style: const TextStyle(color: _studioCyan, fontSize: 12))),
                             ]),
+                            Row(children: [
+                              const Icon(Icons.swap_horiz, size: 17, color: Colors.white60),
+                              const SizedBox(width: 6),
+                              const Text('Start', style: TextStyle(fontSize: 11, color: Colors.white60)),
+                              Expanded(child: Slider(
+                                value: track.offsetSeconds.clamp(0.0, 120.0), min: 0, max: 120, divisions: 120,
+                                onChanged: (v) => setState(() => track.offsetSeconds = v),
+                              )),
+                              SizedBox(width: 48, child: Text('${track.offsetSeconds.toStringAsFixed(1)}s',
+                                textAlign: TextAlign.end, style: const TextStyle(color: _studioCyan, fontSize: 11))),
+                            ]),
                           ]),
                         );
                       },
@@ -436,6 +451,9 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   IconButton(onPressed: bpm >= 240 ? null : () => setState(() => bpm++), icon: const Icon(Icons.add_circle_outline)),
                   const Spacer(), const Text('Effect'), const SizedBox(width: 8),
                   DropdownButton<String>(value: effect, items: const ['None','Echo','Reverb','Warmth','Bass','Bright','Compressor','Normalize'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => effect = v ?? effect)),
+                  const SizedBox(width: 6),
+                  DropdownButton<String>(value: exportFormat, items: const ['MP3', 'WAV'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                    onChanged: (v) => setState(() => exportFormat = v ?? exportFormat)),
                 ]),
                 Row(children: [const Icon(Icons.tune, size: 18), const SizedBox(width: 8), const Text('Master'),
                   Expanded(child: Slider(value: masterGain, min: 0, max: 1.5, divisions: 30, onChanged: (v) => setState(() => masterGain = v))),
