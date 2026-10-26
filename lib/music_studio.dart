@@ -1,5 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:just_audio/just_audio.dart';
+import 'package:record/record.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
@@ -35,6 +40,12 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
   final List<MusicTrack> tracks = [];
   bool exporting = false;
   bool aiBusy = false;
+  bool recording = false;
+  final AudioRecorder recorder = AudioRecorder();
+  final AudioPlayer previewPlayer = AudioPlayer();
+  String? previewingTrackId;
+  final Set<int> drumSteps = <int>{0, 4, 8, 12};
+  final Set<int> hatSteps = <int>{0, 2, 4, 6, 8, 10, 12, 14};
   final TextEditingController promptController = TextEditingController();
   final TextEditingController titleController = TextEditingController(text: 'My New Song');
   final TextEditingController styleController = TextEditingController(text: 'Afrobeats, Afro-pop, Nigerian Pidgin, catchy melody, punchy drums');
@@ -85,6 +96,87 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     }
   }
 
+  Future<void> startRecording() async {
+    try {
+      if (!await recorder.hasPermission()) { message('Microphone permission is required to record vocals.'); return; }
+      final dir = await getApplicationDocumentsDirectory();
+      final path = '${dir.path}/NovaCut_Vocal_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 192000, sampleRate: 44100), path: path);
+      if (mounted) setState(() { recording = true; status = 'Recording vocals… tap Stop recording when finished.'; });
+    } catch (e) { message('Could not start microphone recording: $e'); }
+  }
+
+  Future<void> stopRecording() async {
+    try {
+      final path = await recorder.stop();
+      if (mounted) setState(() {
+        recording = false;
+        if (path != null && File(path).existsSync()) tracks.add(MusicTrack(path: path, kind: 'Vocals'));
+        status = path == null ? 'Recording stopped.' : 'Vocal recording added to your tracks.';
+      });
+    } catch (e) { message('Could not save recording: $e'); }
+  }
+
+  Future<void> previewTrack(MusicTrack track) async {
+    try {
+      if (previewingTrackId == track.id && previewPlayer.playing) { await previewPlayer.pause(); if (mounted) setState(() => status = 'Preview paused.'); return; }
+      await previewPlayer.setFilePath(track.path);
+      if (mounted) setState(() => previewingTrackId = track.id);
+      await previewPlayer.play();
+      if (mounted) setState(() => status = 'Preview finished/paused: ${track.name}');
+    } catch (e) { message('Could not preview audio: $e'); }
+  }
+
+  Future<void> createDrumBeat() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      const sampleRate = 44100;
+      const bpmValue = 110.0;
+      final secondsPerBeat = 60.0 / bpmValue;
+      final sampleCount = (16 * secondsPerBeat * sampleRate).round();
+      final pcm = Int16List(sampleCount);
+      final random = math.Random(7);
+      for (var step = 0; step < 16; step++) {
+        final start = (step * secondsPerBeat * sampleRate).round();
+        if (step % 4 == 0) {
+          final length = math.min((sampleRate * .22).round(), sampleCount - start);
+          for (var j = 0; j < length; j++) {
+            final t = j / sampleRate; final freq = 105 * math.exp(-t * 14) + 42;
+            final mixed = pcm[start + j] + (math.sin(2 * math.pi * freq * t) * math.exp(-t * 19) * .85 * 32767).round();
+            pcm[start + j] = mixed.clamp(-32768, 32767).toInt();
+          }
+        }
+        if (drumSteps.contains(step)) {
+          final length = math.min((sampleRate * .13).round(), sampleCount - start);
+          for (var j = 0; j < length; j++) {
+            final t = j / sampleRate;
+            final mixed = pcm[start + j] + (math.sin(2 * math.pi * 185 * t) * math.exp(-t * 23) * .35 * 32767).round();
+            pcm[start + j] = mixed.clamp(-32768, 32767).toInt();
+          }
+        }
+        if (hatSteps.contains(step)) {
+          final hStart = start + (sampleRate * .02).round();
+          final length = math.min((sampleRate * .045).round(), sampleCount - hStart);
+          if (length > 0) for (var j = 0; j < length; j++) {
+            final value = (random.nextDouble() * 2 - 1) * math.exp(-(j / sampleRate) * 65) * .16;
+            final mixed = pcm[hStart + j] + (value * 32767).round();
+            pcm[hStart + j] = mixed.clamp(-32768, 32767).toInt();
+          }
+        }
+      }
+      final out = '${dir.path}/NovaCut_DrumLoop_${DateTime.now().millisecondsSinceEpoch}.wav';
+      final bytes = BytesBuilder();
+      void ascii(String value) => bytes.add(value.codeUnits);
+      void u32(int value) { final d = ByteData(4)..setUint32(0, value, Endian.little); bytes.add(d.buffer.asUint8List()); }
+      void u16(int value) { final d = ByteData(2)..setUint16(0, value, Endian.little); bytes.add(d.buffer.asUint8List()); }
+      ascii('RIFF'); u32(36 + pcm.length * 2); ascii('WAVE'); ascii('fmt '); u32(16); u16(1); u16(1); u32(sampleRate); u32(sampleRate * 2); u16(2); u16(16); ascii('data'); u32(pcm.length * 2);
+      final pcmBytes = Uint8List(pcm.length * 2); final data = ByteData.sublistView(pcmBytes);
+      for (var i = 0; i < pcm.length; i++) { data.setInt16(i * 2, pcm[i], Endian.little); }
+      bytes.add(pcmBytes); await File(out).writeAsBytes(bytes.takeBytes(), flush: true);
+      if (mounted) setState(() { tracks.add(MusicTrack(path: out, kind: 'Beat')); status = 'Generated a 4-bar drum loop at 110 BPM. Change the 16-step pattern to shape another loop.'; });
+    } catch (e) { message('Beat maker failed: $e'); }
+  }
+
   Future<void> exportMix() async {
     if (exporting) return;
     final active = tracks.where((t) => !t.muted && t.gain > 0 && File(t.path).existsSync()).toList();
@@ -105,7 +197,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
         filters.add('[$i:a]volume=${active[i].gain.toStringAsFixed(3)}[a$i]');
       }
       final labels = List.generate(active.length, (i) => '[a$i]').join();
-      final fx = effect == 'Echo' ? ',aecho=0.8:0.75:70:0.25' : effect == 'Reverb' ? ',aecho=0.8:0.9:80|160:0.25|0.15' : effect == 'Warmth' ? ',equalizer=f=180:t=q:w=1:g=2,equalizer=f=7000:t=q:w=1:g=-1.5' : '';
+      final fx = effect == 'Echo' ? ',aecho=0.8:0.75:70:0.25' : effect == 'Reverb' ? ',aecho=0.8:0.9:80|160:0.25|0.15' : effect == 'Warmth' ? ',equalizer=f=180:t=q:w=1:g=2,equalizer=f=7000:t=q:w=1:g=-1.5' : effect == 'Bass' ? ',equalizer=f=100:t=q:w=1:g=4' : effect == 'Bright' ? ',equalizer=f=6000:t=q:w=1:g=3' : effect == 'Compressor' ? ',acompressor=threshold=0.125:ratio=3:attack=20:release=250' : effect == 'Normalize' ? ',loudnorm=I=-16:TP=-1.5:LRA=11' : '';
       filters.add('${labels}amix=inputs=${active.length}:duration=longest:dropout_transition=0:normalize=0,volume=${masterGain.toStringAsFixed(3)}$fx[aout]');
       final command = '-y ${inputs.join(' ')} -filter_complex "${filters.join(';')}" '
           '-map "[aout]" -c:a libmp3lame -b:a 192k -ar 44100 ${quote(output)}';
@@ -169,7 +261,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
   }
 
   @override
-  void dispose() { promptController.dispose(); titleController.dispose(); styleController.dispose(); super.dispose(); }
+  void dispose() { recorder.dispose(); previewPlayer.dispose(); promptController.dispose(); titleController.dispose(); styleController.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -205,6 +297,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   studioButton('Add vocals', Icons.mic_none, () => addTracks('Vocals')),
                   studioButton('Add instrument', Icons.piano, () => addTracks('Instrument')),
                   studioButton('Add audio', Icons.library_music, () => addTracks('Audio')),
+                  studioButton(recording ? 'Stop recording' : 'Record vocals', recording ? Icons.stop_circle : Icons.mic, recording ? stopRecording : startRecording, disabled: exporting),
+                  studioButton('Make drum loop', Icons.grid_view, createDrumBeat, disabled: exporting),
                   studioButton('Cut beat', Icons.content_cut, () { if (tracks.isNotEmpty) cutTrack(tracks.last); else message('Add an audio track first.'); }),
                   studioButton('Load session', Icons.folder_open, loadSession),
                   studioButton('Save session', Icons.save_outlined, saveSession),
@@ -240,6 +334,18 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   )),
                 ],
                 const Text('KIE generation and stem extraction use credits. You can cut any imported or generated track and keep the selected section as a separate editable track.', style: TextStyle(fontSize: 10, color: Colors.white54)),
+              ]),
+            ),
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10), padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: _studioPanel, borderRadius: BorderRadius.circular(14)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [const Icon(Icons.grid_view, color: _studioCyan), const SizedBox(width: 8), const Text('16-STEP DRUM PATTERN', style: TextStyle(fontWeight: FontWeight.w800)), const Spacer(), const Text('110 BPM', style: TextStyle(color: _studioCyan))]),
+                const SizedBox(height: 6), const Text('Kick / snare pattern', style: TextStyle(fontSize: 11, color: Colors.white60)),
+                Wrap(spacing: 4, runSpacing: 4, children: List.generate(16, (i) => SizedBox(width: 30, height: 32, child: FilledButton(onPressed: () => setState(() { if (drumSteps.contains(i)) { drumSteps.remove(i); } else { drumSteps.add(i); } }), style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: drumSteps.contains(i) ? _studioPurple : Colors.white12), child: Text('${i + 1}', style: const TextStyle(fontSize: 10))))),
+                const SizedBox(height: 6), const Text('Hi-hat pattern', style: TextStyle(fontSize: 11, color: Colors.white60)),
+                Wrap(spacing: 4, runSpacing: 4, children: List.generate(16, (i) => SizedBox(width: 30, height: 32, child: FilledButton(onPressed: () => setState(() { if (hatSteps.contains(i)) { hatSteps.remove(i); } else { hatSteps.add(i); } }), style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: hatSteps.contains(i) ? _studioCyan.withValues(alpha: .7) : Colors.white12), child: Text('${i + 1}', style: const TextStyle(fontSize: 10))))),
+                const SizedBox(height: 6), const Text('Generate a new 4-bar WAV after changing the pattern. Synthesized drum sounds are used; no sample pack is required.', style: TextStyle(fontSize: 10, color: Colors.white54)),
               ]),
             ),
             Padding(
@@ -292,6 +398,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                                 const SizedBox(height: 3),
                                 Text(track.kind.toUpperCase(), style: const TextStyle(fontSize: 10, color: _studioCyan, letterSpacing: 1)),
                               ])),
+                              IconButton(tooltip: 'Preview track', onPressed: () => previewTrack(track), icon: Icon(previewingTrackId == track.id && previewPlayer.playing ? Icons.pause_circle : Icons.play_circle_outline, color: _studioCyan)),
                               const Icon(Icons.drag_handle, color: Colors.white38),
                               IconButton(tooltip: track.muted ? 'Unmute track' : 'Mute track',
                                 onPressed: () => setState(() => track.muted = !track.muted),
@@ -302,6 +409,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                                 status = 'Track removed.';
                               }), icon: const Icon(Icons.close)),
                             ]),
+                            SizedBox(height: 24, width: double.infinity, child: CustomPaint(painter: _TrackWaveformPainter(seed: track.path.hashCode, color: track.muted ? Colors.white24 : _studioCyan))),
                             Row(children: [
                               const Icon(Icons.volume_down, size: 17, color: Colors.white60),
                               Expanded(child: Slider(
@@ -327,7 +435,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   Text('$bpm', style: const TextStyle(color: _studioCyan, fontWeight: FontWeight.bold)),
                   IconButton(onPressed: bpm >= 240 ? null : () => setState(() => bpm++), icon: const Icon(Icons.add_circle_outline)),
                   const Spacer(), const Text('Effect'), const SizedBox(width: 8),
-                  DropdownButton<String>(value: effect, items: const ['None','Echo','Reverb','Warmth'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => effect = v ?? effect)),
+                  DropdownButton<String>(value: effect, items: const ['None','Echo','Reverb','Warmth','Bass','Bright','Compressor','Normalize'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => effect = v ?? effect)),
                 ]),
                 Row(children: [const Icon(Icons.tune, size: 18), const SizedBox(width: 8), const Text('Master'),
                   Expanded(child: Slider(value: masterGain, min: 0, max: 1.5, divisions: 30, onChanged: (v) => setState(() => masterGain = v))),
@@ -772,4 +880,22 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       ),
     );
   }
+}
+
+class _TrackWaveformPainter extends CustomPainter {
+  const _TrackWaveformPainter({required this.seed, required this.color});
+  final int seed;
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color.withValues(alpha: .8)..strokeWidth = 1.4..strokeCap = StrokeCap.round;
+    var value = seed.abs() + 1;
+    for (var x = 2.0; x < size.width; x += 4) {
+      value = (value * 1103515245 + 12345) & 0x7fffffff;
+      final amplitude = 2.0 + (value % (size.height.toInt().clamp(2, 22))) / 2;
+      canvas.drawLine(Offset(x, size.height / 2 - amplitude), Offset(x, size.height / 2 + amplitude), paint);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant _TrackWaveformPainter oldDelegate) => oldDelegate.seed != seed || oldDelegate.color != color;
 }
