@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/services.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
@@ -297,6 +296,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                               IconButton(tooltip: track.muted ? 'Unmute track' : 'Mute track',
                                 onPressed: () => setState(() => track.muted = !track.muted),
                                 icon: Icon(track.muted ? Icons.volume_off : Icons.volume_up)),
+                              IconButton(tooltip: 'Cut this track', onPressed: () => cutTrack(track), icon: const Icon(Icons.content_cut)),
                               IconButton(tooltip: 'Remove track', onPressed: () => setState(() {
                                 tracks.removeAt(index);
                                 status = 'Track removed.';
