@@ -28,3 +28,10 @@ The Music Studio includes KIE AI song generation, generated audio import, stem e
 4. Check KIE credits and pricing before generating or separating stems. KIE media URLs expire after a limited retention period.
 
 This integration keeps the KIE secret out of the mobile app. For production, add user authentication and per-user rate limiting to the Edge Function before public release. Build and test the Flutter app on Android before distributing an APK.
+
+
+## Music Studio upgrades
+
+The Music Studio now includes microphone vocal recording (via the `record` package), per-track audio preview (via `just_audio`), waveform-style visual lanes, a 16-step synthesized drum sequencer that creates a local WAV loop at the selected BPM, audio section cutting, per-track gain/mute/reordering, and MP3 mixing with Echo, Reverb, Warmth, Bass, Bright, Compressor, or Normalize processing. The waveform display is a visual guide, not a decoded sample-accurate waveform; audio preview is per-track and is not synchronized multi-track playback. The drum maker uses synthesized sounds rather than a bundled sample library.
+
+For Android vocal recording, ensure the app manifest includes `android.permission.RECORD_AUDIO` and test the runtime microphone permission on-device. The KIE integration still requires deploying the Supabase Edge Function and setting `KIE_API_KEY` as a server secret; KIE request/response compatibility, stem separation, Flutter dependency resolution, and Android build must be tested before release. No API secret should be committed to the repository.
