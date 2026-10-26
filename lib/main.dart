@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import 'music_studio.dart';
 
 void main() => runApp(const NovaCutApp());
 
@@ -464,7 +465,7 @@ class _EditorPageState extends State<EditorPage> {
     final current = active;
     return Scaffold(
       appBar: AppBar(title: const Text('NovaCut Studio', style: TextStyle(fontWeight: FontWeight.w800)),
-        actions: [IconButton(tooltip: 'Undo', onPressed: undo, icon: const Icon(Icons.undo)),
+        actions: [TextButton.icon(tooltip: 'Open Music Studio', onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const MusicStudioPage())), icon: const Icon(Icons.graphic_eq), label: const Text('Music Studio')), IconButton(tooltip: 'Undo', onPressed: undo, icon: const Icon(Icons.undo)),
           IconButton(tooltip: 'Redo', onPressed: redo, icon: const Icon(Icons.redo)),
           IconButton(tooltip: 'Save project', onPressed: saveProject, icon: const Icon(Icons.save_outlined)),
           IconButton(tooltip: 'Load project', onPressed: loadProject, icon: const Icon(Icons.folder_open))]),
