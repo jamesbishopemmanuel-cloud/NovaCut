@@ -527,8 +527,8 @@ class _EditorPageState extends State<EditorPage> {
         SizedBox(height: 126, child: clips.isEmpty
           ? const Center(child: Text('Add multiple videos to create a sequence', style: TextStyle(color: Colors.white54)))
           : ReorderableListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(10),
-              itemCount: clips.length, onReorder: (oldIndex, newIndex) {
-                checkpoint(); if (newIndex > oldIndex) newIndex--;
+              itemCount: clips.length, onReorderItem: (oldIndex, newIndex) {
+                checkpoint();
                 final item = clips.removeAt(oldIndex); clips.insert(newIndex, item);
                 selected = newIndex; setState(() {});
               }, itemBuilder: (ctx, i) {
