@@ -212,7 +212,7 @@ class _EditorPageState extends State<EditorPage> {
       title: const Text('Add animation keyframe'),
       content: TextField(controller: ctl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Timeline time (seconds)')),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctl.text)), child: const Text('Add')]));
+        TextButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctl.text)), child: const Text('Add'))]));
     if (result == null || result < 0) return;
     setState(() => keyframes.add(AnimationKeyframe(time: result, scale: 1.2, x: .5, y: .5)));
     notify('Keyframe saved at ${result.toStringAsFixed(2)}s. Keyframes are stored in the project.');
@@ -240,7 +240,7 @@ class _EditorPageState extends State<EditorPage> {
       content: TextField(controller: ctl, maxLines: 3, maxLength: 120,
         decoration: const InputDecoration(hintText: 'Type title or caption')),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, ctl.text), child: const Text('Apply')]),
+        TextButton(onPressed: () => Navigator.pop(ctx, ctl.text), child: const Text('Apply'))],
     ));
     if (result != null) setState(() => overlay = result.trim());
   }
@@ -465,7 +465,7 @@ class _EditorPageState extends State<EditorPage> {
     final current = active;
     return Scaffold(
       appBar: AppBar(title: const Text('NovaCut Studio', style: TextStyle(fontWeight: FontWeight.w800)),
-        actions: [TextButton.icon(tooltip: 'Open Music Studio', onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const MusicStudioPage())), icon: const Icon(Icons.graphic_eq), label: const Text('Music Studio')), IconButton(tooltip: 'Undo', onPressed: undo, icon: const Icon(Icons.undo)),
+        actions: [TextButton.icon(onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const MusicStudioPage())), icon: const Icon(Icons.graphic_eq), label: const Text('Music Studio')), IconButton(tooltip: 'Undo', onPressed: undo, icon: const Icon(Icons.undo)),
           IconButton(tooltip: 'Redo', onPressed: redo, icon: const Icon(Icons.redo)),
           IconButton(tooltip: 'Save project', onPressed: saveProject, icon: const Icon(Icons.save_outlined)),
           IconButton(tooltip: 'Load project', onPressed: loadProject, icon: const Icon(Icons.folder_open))]),
