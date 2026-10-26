@@ -33,3 +33,42 @@ NovaCut is an original Flutter-based, CapCut-inspired Android editor with its ow
 - lib/main.dart — editor UI, local project save/load and FFmpeg export.
 - pubspec.yaml — Flutter dependencies.
 - .github/workflows/android.yml — APK build workflow.
+
+
+## KIE AI through Supabase
+
+NovaCut now includes a Supabase Edge Function proxy at `supabase/functions/kie-ai/index.ts`. It supports KIE asynchronous task creation and task-status lookup while keeping the KIE API key on the server.
+
+### Configure and deploy
+
+1. In the Supabase project intended for NovaCut, open **Edge Functions → Secrets** and add `KIE_API_KEY` with the key from your KIE account. Do not put this secret in Flutter, the APK, or GitHub.
+2. Install the Supabase CLI and link this repository to that Supabase project.
+3. Deploy the function: `supabase functions deploy kie-ai`.
+4. The caller must be signed in to Supabase and send its session access token in `Authorization: Bearer <access-token>`.
+
+### Request examples
+
+Create an image/video/music task using the model's exact KIE model ID and its documented input parameters:
+
+```json
+{
+  "action": "create",
+  "model": "MODEL_ID_FROM_KIE_DOCS",
+  "input": {
+    "prompt": "Describe the content to generate"
+  }
+}
+```
+
+Check a task:
+
+```json
+{
+  "action": "status",
+  "taskId": "TASK_ID_RETURNED_BY_KIE"
+}
+```
+
+Call the deployed function at `<SUPABASE_URL>/functions/v1/kie-ai` with `Content-Type: application/json`, the Supabase publishable key in the `apikey` header, and the signed-in user's access token in the Authorization header. Model IDs and input fields differ by KIE model; use the matching model documentation. A created task is not finished until its status reports completion.
+
+**Important:** The Edge Function code is committed, but it has not been deployed to Supabase and no KIE key has been configured. NovaCut's Flutter UI is not yet wired to call this function; that requires connecting the app to the intended Supabase project and adding sign-in plus AI-generation screens.
