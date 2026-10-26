@@ -281,7 +281,7 @@ class _EditorHomeState extends State<EditorHome> {
         backgroundColor: bg,
         title: const Row(children: [Icon(Icons.cut_rounded, color: cyan), SizedBox(width: 8), Text('NovaCut', style: TextStyle(fontWeight: FontWeight.w800))]),
         actions: [
-          IconButton(tooltip: 'AI Tools', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiToolsPage())), icon: const Icon(Icons.auto_awesome, color: cyan)),
+          Padding(padding: const EdgeInsets.only(right: 6), child: FilledButton.icon(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiToolsPage())), icon: const Icon(Icons.auto_awesome, size: 17), label: const Text('AI Tools'))),
           IconButton(tooltip: 'Project settings', onPressed: projectMenu, icon: const Icon(Icons.tune_rounded)),
           Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: busy ? null : exportMp4, icon: const Icon(Icons.ios_share_rounded, size: 18), label: Text(busy ? 'Working…' : 'Export MP4')))
         ]),
