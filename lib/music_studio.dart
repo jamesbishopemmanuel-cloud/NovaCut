@@ -278,6 +278,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       body: SafeArea(
         child: Column(
           children: [
+            Expanded(child: SingleChildScrollView(child: Column(children: [
             Container(
               margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               padding: const EdgeInsets.all(16),
@@ -352,6 +353,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                 const SizedBox(height: 6), const Text('Generate a new 4-bar WAV after changing the pattern. Synthesized drum sounds are used; no sample pack is required.', style: TextStyle(fontSize: 10, color: Colors.white54)),
               ]),
             ),
+            ]))),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(children: [
