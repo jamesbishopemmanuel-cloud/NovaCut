@@ -30,6 +30,31 @@ class ClipItem {
   ClipItem copy() => ClipItem(id: id, path: path, start: start, end: end);
 }
 
+enum TrackKind { video, audio, sticker, caption }
+
+class TimelineItem {
+  TimelineItem({required this.id, required this.kind, required this.label, this.path, this.start = 0, this.duration = 3, this.x = 0.5, this.y = 0.5, this.scale = 1, this.rotation = 0});
+  final String id;
+  final TrackKind kind;
+  final String label;
+  final String? path;
+  double start, duration, x, y, scale, rotation;
+  Map<String, dynamic> toJson() => {'id': id, 'kind': kind.name, 'label': label, 'path': path, 'start': start, 'duration': duration, 'x': x, 'y': y, 'scale': scale, 'rotation': rotation};
+  factory TimelineItem.fromJson(Map<String, dynamic> j) => TimelineItem(
+    id: j['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
+    kind: TrackKind.values.firstWhere((k) => k.name == j['kind'], orElse: () => TrackKind.video),
+    label: j['label'] as String? ?? 'Layer', path: j['path'] as String?,
+    start: (j['start'] as num?)?.toDouble() ?? 0, duration: (j['duration'] as num?)?.toDouble() ?? 3,
+    x: (j['x'] as num?)?.toDouble() ?? .5, y: (j['y'] as num?)?.toDouble() ?? .5,
+    scale: (j['scale'] as num?)?.toDouble() ?? 1, rotation: (j['rotation'] as num?)?.toDouble() ?? 0);
+}
+
+class AnimationKeyframe {
+  AnimationKeyframe({required this.time, required this.scale, required this.x, required this.y});
+  final double time, scale, x, y;
+  Map<String, dynamic> toJson() => {'time': time, 'scale': scale, 'x': x, 'y': y};
+}
+
 class NovaCutApp extends StatelessWidget {
   const NovaCutApp({super.key});
   @override
@@ -48,6 +73,12 @@ class EditorPage extends StatefulWidget {
 
 class _EditorPageState extends State<EditorPage> {
   final List<ClipItem> clips = [];
+  final List<TimelineItem> layerItems = [];
+  final List<AnimationKeyframe> keyframes = [];
+  String transition = 'Cut';
+  bool chromaKeyEnabled = false;
+  double chromaSimilarity = .18;
+  String sticker = '⭐';
   final List<List<ClipItem>> undoStack = [];
   final List<List<ClipItem>> redoStack = [];
   VideoPlayerController? player;
@@ -159,6 +190,42 @@ class _EditorPageState extends State<EditorPage> {
     setState(() {});
   }
 
+  Future<void> addTimelineLayer(TrackKind kind) async {
+    if (clips.isEmpty) { notify('Add a base video first.'); return; }
+    String? path;
+    if (kind == TrackKind.video || kind == TrackKind.audio) {
+      final picked = await FilePicker.platform.pickFiles(type: kind == TrackKind.audio ? FileType.audio : FileType.media);
+      path = picked?.files.single.path;
+      if (path == null) return;
+    }
+    final item = TimelineItem(id: DateTime.now().microsecondsSinceEpoch.toString(), kind: kind,
+      label: kind == TrackKind.video ? 'Overlay video' : kind == TrackKind.audio ? 'Audio layer' : kind == TrackKind.sticker ? 'Sticker $sticker' : 'Caption',
+      path: path, start: player?.value.position.inMilliseconds.toDouble().toDouble().toDouble() ?? 0, duration: 3);
+    setState(() => layerItems.add(item));
+    notify('${kind.name} layer added; adjust its timing in the multi-track lane.');
+  }
+
+  Future<void> addKeyframe() async {
+    final ctl = TextEditingController(text: (player?.value.position.inMilliseconds ?? 0) == 0 ? '0' : ((player!.value.position.inMilliseconds / 1000).toStringAsFixed(2)));
+    final result = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Add animation keyframe'),
+      content: TextField(controller: ctl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Timeline time (seconds)')),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctl.text)), child: const Text('Add')]));
+    if (result == null || result < 0) return;
+    setState(() => keyframes.add(AnimationKeyframe(time: result, scale: 1.2, x: .5, y: .5)));
+    notify('Keyframe saved at ${result.toStringAsFixed(2)}s. Keyframes are stored in the project.');
+  }
+
+  Future<void> chooseSticker() async {
+    const choices = ['⭐','🔥','❤️','✨','⚡','😂','🎬','💥','🌈','👑'];
+    final picked = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Choose sticker'),
+      content: Wrap(spacing: 10, runSpacing: 10, children: choices.map((v) => InkWell(onTap: () => Navigator.pop(ctx, v), child: Padding(padding: const EdgeInsets.all(6), child: Text(v, style: const TextStyle(fontSize: 30))))).toList()),
+    ));
+    if (picked != null) { setState(() => sticker = picked); await addTimelineLayer(TrackKind.sticker); }
+  }
+
   Future<void> pickMusic() async {
     final p = await FilePicker.platform.pickFiles(type: FileType.audio);
     final path = p?.files.single.path;
@@ -189,7 +256,7 @@ class _EditorPageState extends State<EditorPage> {
     final data = {'version': 2, 'clips': clips.map((c) => c.toJson()).toList(),
       'musicPath': musicPath, 'overlay': overlay, 'aspect': aspect, 'filter': filter,
       'musicVolume': musicVolume, 'originalVolume': originalVolume, 'speed': speed, 'fadeSeconds': fadeSeconds,
-      'brightness': brightness, 'contrast': contrast, 'saturation': saturation, 'savedAt': DateTime.now().toIso8601String()};
+      'brightness': brightness, 'contrast': contrast, 'saturation': saturation, 'layers': layerItems.map((e) => e.toJson()).toList(), 'keyframes': keyframes.map((e) => e.toJson()).toList(), 'transition': transition, 'chromaKeyEnabled': chromaKeyEnabled, 'chromaSimilarity': chromaSimilarity, 'sticker': sticker, 'savedAt': DateTime.now().toIso8601String()};
     await File('${dir.path}/project.json').writeAsString(const JsonEncoder.withIndent('  ').convert(data));
     notify('Project saved offline on this device');
   }
@@ -213,6 +280,9 @@ class _EditorPageState extends State<EditorPage> {
       brightness = (data['brightness'] as num?)?.toDouble() ?? 0;
       contrast = (data['contrast'] as num?)?.toDouble() ?? 1;
       saturation = (data['saturation'] as num?)?.toDouble() ?? 1;
+      layerItems..clear()..addAll(((data['layers'] as List?) ?? []).map((e) => TimelineItem.fromJson(Map<String, dynamic>.from(e))));
+      keyframes..clear()..addAll(((data['keyframes'] as List?) ?? []).map((e) { final j = Map<String, dynamic>.from(e); return AnimationKeyframe(time: (j['time'] as num).toDouble(), scale: (j['scale'] as num).toDouble(), x: (j['x'] as num).toDouble(), y: (j['y'] as num).toDouble()); }));
+      transition = data['transition'] as String? ?? 'Cut'; chromaKeyEnabled = data['chromaKeyEnabled'] as bool? ?? false; chromaSimilarity = (data['chromaSimilarity'] as num?)?.toDouble() ?? .18; sticker = data['sticker'] as String? ?? '⭐';
       selected = 0;
       if (clips.isNotEmpty && await File(clips.first.path).exists()) {
         await loadPreview(clips.first);
@@ -294,6 +364,7 @@ class _EditorPageState extends State<EditorPage> {
     if (filter == 'Grayscale') bits.add('hue=s=0');
     if (filter == 'Warm') bits.add('colorbalance=rs=.08:gs=.02:bs=-.04');
     if (filter == 'Vintage') bits.add('eq=saturation=.75:contrast=1.08:brightness=.02');
+    if (chromaKeyEnabled) bits.add('chromakey=0x00FF00:${chromaSimilarity.toStringAsFixed(2)}:0.08');
     bits.add('eq=brightness=${brightness.toStringAsFixed(2)}:contrast=${contrast.toStringAsFixed(2)}:saturation=${saturation.toStringAsFixed(2)}');
     return bits.join(',');
   }
@@ -419,6 +490,30 @@ class _EditorPageState extends State<EditorPage> {
           action('Export Project', Icons.save_alt, exportProjectFile),
           action('Export MP4', Icons.ios_share, export, disabled: busy || clips.isEmpty),
         ])),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Wrap(spacing: 6, runSpacing: 6, children: [
+          action('Video layer', Icons.video_collection, () => addTimelineLayer(TrackKind.video)),
+          action('Audio layer', Icons.multitrack_audio, () => addTimelineLayer(TrackKind.audio)),
+          action('Sticker', Icons.emoji_emotions_outlined, chooseSticker),
+          action('Keyframe', Icons.keyframe, addKeyframe),
+          action('Chroma key', Icons.colorize, () => setState(() { chromaKeyEnabled = !chromaKeyEnabled; notify(chromaKeyEnabled ? 'Green-screen chroma key enabled for export.' : 'Chroma key disabled.'); })),
+        ])),
+        if (layerItems.isNotEmpty || keyframes.isNotEmpty) Container(
+          margin: const EdgeInsets.fromLTRB(12, 4, 12, 8), padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [const Icon(Icons.layers_outlined, color: cyan), const SizedBox(width: 6), const Text('MULTI-TRACK LAYERS', style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), Text('${layerItems.length} layers • ${keyframes.length} keyframes', style: const TextStyle(fontSize: 11, color: Colors.white60))]),
+            const SizedBox(height: 8),
+            ...layerItems.map((item) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
+              SizedBox(width: 68, child: Text(item.kind.name.toUpperCase(), style: const TextStyle(fontSize: 10, color: cyan))),
+              Expanded(child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              SizedBox(width: 86, child: Text('${item.start.toStringAsFixed(1)}s · ${item.duration.toStringAsFixed(1)}s', style: const TextStyle(fontSize: 10))),
+              IconButton(tooltip: 'Remove layer', visualDensity: VisualDensity.compact, onPressed: () => setState(() => layerItems.remove(item)), icon: const Icon(Icons.close, size: 17)),
+            ]))),
+            Row(children: [const Text('Transition'), const SizedBox(width: 8), Expanded(child: DropdownButton<String>(isExpanded: true, value: transition, items: const ['Cut','Fade','Dissolve','Wipe left','Wipe right'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => transition = v ?? transition)))]),
+            if (chromaKeyEnabled) Row(children: [const Text('Green screen tolerance'), Expanded(child: Slider(value: chromaSimilarity, min: .05, max: .5, divisions: 9, onChanged: (v) => setState(() => chromaSimilarity = v))), Text(chromaSimilarity.toStringAsFixed(2))]),
+            if (keyframes.isNotEmpty) Text('Keyframe times: ${keyframes.map((k) => '${k.time.toStringAsFixed(2)}s').join(', ')}', style: const TextStyle(fontSize: 11, color: Colors.white60)),
+          ]),
+        ),
         Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 2), child: Row(children: [
           const Text('TIMELINE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
           const Spacer(), Text('${clips.length} clips • ${stamp(total)}', style: const TextStyle(color: Colors.white60)),
