@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -31,6 +32,9 @@ class MusicStudioPage extends StatefulWidget {
 class _MusicStudioPageState extends State<MusicStudioPage> {
   final List<MusicTrack> tracks = [];
   bool exporting = false;
+  double masterGain = 1.0;
+  int bpm = 110;
+  String effect = 'None';
   String status = 'Import audio, vocals, or beats to start your session.';
   String quote(String s) => "'${s.replaceAll("'", "'\\''")}'";
 
@@ -99,6 +103,42 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     }
   }
 
+  Future<void> saveSession() async {
+    try {
+      final data = {
+        'version': 1, 'bpm': bpm, 'masterGain': masterGain, 'effect': effect,
+        'tracks': tracks.map((t) => {'path': t.path, 'kind': t.kind, 'gain': t.gain, 'muted': t.muted}).toList(),
+      };
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Music Studio session', fileName: 'NovaCut_music_session.json',
+        type: FileType.custom, allowedExtensions: ['json']);
+      if (path == null) return;
+      await File(path).writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+      message('Session saved. Keep your original audio files in place.');
+    } catch (e) { message('Could not save session: $e'); }
+  }
+
+  Future<void> loadSession() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json']);
+      final path = picked?.files.single.path;
+      if (path == null) return;
+      final data = jsonDecode(await File(path).readAsString()) as Map<String, dynamic>;
+      final incoming = (data['tracks'] as List).map((raw) {
+        final item = Map<String, dynamic>.from(raw);
+        return MusicTrack(path: item['path'] as String, kind: item['kind'] as String,
+          gain: (item['gain'] as num?)?.toDouble() ?? .8, muted: item['muted'] as bool? ?? false);
+      }).where((t) => File(t.path).existsSync()).toList();
+      setState(() {
+        tracks..clear()..addAll(incoming);
+        bpm = (data['bpm'] as num?)?.toInt() ?? 110;
+        masterGain = (data['masterGain'] as num?)?.toDouble() ?? 1;
+        effect = data['effect'] as String? ?? 'None';
+        status = 'Session loaded: ${tracks.length} available tracks.';
+      });
+    } catch (e) { message('Could not load session: $e'); }
+  }
+
   Widget studioButton(String label, IconData icon, VoidCallback onTap, {bool disabled = false}) {
     return FilledButton.tonalIcon(
       onPressed: disabled ? null : onTap,
@@ -140,7 +180,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   studioButton('Add beat', Icons.album_outlined, () => addTracks('Beat')),
                   studioButton('Add vocals', Icons.mic_none, () => addTracks('Vocals')),
                   studioButton('Add instrument', Icons.piano, () => addTracks('Instrument')),
-                  studioButton('Add audio', Icons.library_music, () => addTracks('Audio')),
+                  studioButton('Add audio', Icons.library_music, () => addTracks('Audio')),\n                  studioButton('Load session', Icons.folder_open, loadSession),\n                  studioButton('Save session', Icons.save_outlined, saveSession),
                 ]),
               ]),
             ),
@@ -193,7 +233,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                                 const SizedBox(height: 3),
                                 Text(track.kind.toUpperCase(), style: const TextStyle(fontSize: 10, color: _studioCyan, letterSpacing: 1)),
                               ])),
-                              IconButton(tooltip: track.muted ? 'Unmute track' : 'Mute track',
+                              const Icon(Icons.drag_handle, color: Colors.white38),\n                              IconButton(tooltip: track.muted ? 'Unmute track' : 'Mute track',
                                 onPressed: () => setState(() => track.muted = !track.muted),
                                 icon: Icon(track.muted ? Icons.volume_off : Icons.volume_up)),
                               IconButton(tooltip: 'Remove track', onPressed: () => setState(() {
@@ -230,7 +270,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   style: FilledButton.styleFrom(backgroundColor: _studioPurple, padding: const EdgeInsets.symmetric(vertical: 14)),
                 ),
                 const SizedBox(height: 4),
-                const Text('Mixing/export is available here. Live playback, recording and advanced effects require additional audio-engine integration.',
+                const Text('Includes multitrack mix, gain, mute, track ordering, BPM notes, basic export effects and session save/load. Live recording, instrument synthesis and real-time playback still require a dedicated audio engine.',
                   style: TextStyle(fontSize: 10, color: Colors.white38)),
               ]),
             ),
