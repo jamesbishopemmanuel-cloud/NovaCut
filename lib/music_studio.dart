@@ -18,8 +18,8 @@ const _studioPurple = Color(0xFF7C5CFF);
 const _studioCyan = Color(0xFF39D8E8);
 
 class MusicTrack {
-  MusicTrack({required this.path, required this.kind, double gain = 0.8, bool muted = false, this.offsetSeconds = 0, this.kieTaskId, this.kieAudioId})
-      : gain = gain, muted = muted, id = DateTime.now().microsecondsSinceEpoch.toString();
+  MusicTrack({required this.path, required this.kind, this.gain = 0.8, this.muted = false, this.offsetSeconds = 0, this.kieTaskId, this.kieAudioId})
+      : id = DateTime.now().microsecondsSinceEpoch.toString();
   final String id;
   final String path;
   String kind;
@@ -111,7 +111,9 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       final path = await recorder.stop();
       if (mounted) setState(() {
         recording = false;
-        if (path != null && File(path).existsSync()) tracks.add(MusicTrack(path: path, kind: 'Vocals'));
+        if (path != null && File(path).existsSync()) {
+          tracks.add(MusicTrack(path: path, kind: 'Vocals'));
+        }
         status = path == null ? 'Recording stopped.' : 'Vocal recording added to your tracks.';
       });
     } catch (e) { message('Could not save recording: $e'); }
@@ -157,10 +159,12 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
         if (hatSteps.contains(step)) {
           final hStart = start + (sampleRate * .02).round();
           final length = math.min((sampleRate * .045).round(), sampleCount - hStart);
-          if (length > 0) for (var j = 0; j < length; j++) {
-            final value = (random.nextDouble() * 2 - 1) * math.exp(-(j / sampleRate) * 65) * .16;
-            final mixed = pcm[hStart + j] + (value * 32767).round();
-            pcm[hStart + j] = mixed.clamp(-32768, 32767).toInt();
+          if (length > 0) {
+            for (var j = 0; j < length; j++) {
+              final value = (random.nextDouble() * 2 - 1) * math.exp(-(j / sampleRate) * 65) * .16;
+              final mixed = pcm[hStart + j] + (value * 32767).round();
+              pcm[hStart + j] = mixed.clamp(-32768, 32767).toInt();
+            }
           }
         }
       }
@@ -304,7 +308,13 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   studioButton('Add audio', Icons.library_music, () => addTracks('Audio')),
                   studioButton(recording ? 'Stop recording' : 'Record vocals', recording ? Icons.stop_circle : Icons.mic, recording ? stopRecording : startRecording, disabled: exporting),
                   studioButton('Make drum loop', Icons.grid_view, createDrumBeat, disabled: exporting),
-                  studioButton('Cut beat', Icons.content_cut, () { if (tracks.isNotEmpty) cutTrack(tracks.last); else message('Add an audio track first.'); }),
+                  studioButton('Cut beat', Icons.content_cut, () {
+                    if (tracks.isNotEmpty) {
+                      cutTrack(tracks.last);
+                    } else {
+                      message('Add an audio track first.');
+                    }
+                  }),
                   studioButton('Load session', Icons.folder_open, loadSession),
                   studioButton('Save session', Icons.save_outlined, saveSession),
                 ]),
@@ -379,7 +389,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   : ReorderableListView.builder(
                       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                       itemCount: tracks.length,
-                      onReorder: (oldIndex, newIndex) { setState(() { if (newIndex > oldIndex) newIndex--; final item = tracks.removeAt(oldIndex); tracks.insert(newIndex, item); }); },
+                      onReorderItem: (oldIndex, newIndex) { setState(() { final item = tracks.removeAt(oldIndex); tracks.insert(newIndex, item); }); },
                       itemBuilder: (context, index) {
                         final track = tracks[index];
                         return Container(
@@ -499,8 +509,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     dynamic raw = data['resultJson'] ?? data['result_json'];
     if (raw is String) { try { raw = jsonDecode(raw); } catch (_) {} }
     final root = raw is Map ? raw : data;
-    final resultObject = root is Map ? (root['resultObject'] ?? root['result_object']) : null;
-    final urls = root is Map ? (root['resultUrls'] ?? root['result_urls']) : null;
+    final resultObject = root['resultObject'] ?? root['result_object'];
+    final urls = root['resultUrls'] ?? root['result_urls'];
     final versions = <Map<String, dynamic>>[];
     if (urls is List) {
       for (var i = 0; i < urls.length; i++) {
