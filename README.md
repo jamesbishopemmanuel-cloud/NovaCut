@@ -16,3 +16,15 @@ Project JSON stores edit settings and media paths, not source media bytes. Origi
 
 ## QA and limitations
 Test on Android with media that does and does not contain audio. FFmpeg package compatibility, font availability, codecs, memory use, and export behavior still require verification. The project currently uses an ordered clip list, not a true multi-track timeline. Animated transitions, keyframes, stickers, picture-in-picture, chroma key, automatic captions, voice recording, waveform editing, and a rich effects library are not implemented. NovaCut is not yet a complete CapCut replacement.
+
+
+## KIE AI Music Studio setup
+
+The Music Studio includes KIE AI song generation, generated audio import, stem extraction, and destructive-copy-free beat cutting. KIE credentials must remain on the server.
+
+1. Deploy `supabase/functions/kie-music/index.ts` to your Supabase project as the `kie-music` Edge Function.
+2. Add the server secret `KIE_API_KEY` in Supabase Edge Function secrets.
+3. Build the app with `--dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co` and `--dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_PUBLISHABLE_OR_ANON_KEY`.
+4. Check KIE credits and pricing before generating or separating stems. KIE media URLs expire after a limited retention period.
+
+This integration keeps the KIE secret out of the mobile app. For production, add user authentication and per-user rate limiting to the Edge Function before public release. Build and test the Flutter app on Android before distributing an APK.
