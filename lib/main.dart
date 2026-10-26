@@ -33,7 +33,7 @@ class EditorHome extends StatefulWidget {
 class _EditorHomeState extends State<EditorHome> {
   VideoPlayerController? video;
   String? videoPath, audioPath, lastExport;
-  String ratio = '9:16', transition = 'Fade in/out', overlayText = '';
+  String ratio = '9:16', transition = 'Fade in/out', overlayText = '', filterPreset = 'Original';
   double trimIn = 0, trimOut = 1, musicVolume = .75, speed = 1;
   bool muted = false, busy = false;
   Duration get duration => video?.value.isInitialized == true ? video!.value.duration : Duration.zero;
