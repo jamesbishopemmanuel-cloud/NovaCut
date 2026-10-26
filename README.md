@@ -24,7 +24,7 @@ The Music Studio includes KIE AI song generation, generated audio import, stem e
 
 1. Deploy `supabase/functions/kie-music/index.ts` to your Supabase project as the `kie-music` Edge Function.
 2. Add the server secret `KIE_API_KEY` in Supabase Edge Function secrets.
-3. Build the app with `--dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co` and `--dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_PUBLISHABLE_OR_ANON_KEY`.
+3. Build the app with `--dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co` and `--dart-define=SUPABASE_ANON_KEY=YOUR_LEGACY_SUPABASE_ANON_JWT_KEY`. The current mobile function call sends this key as a bearer token, so a non-JWT publishable key alone will not pass Supabase's default Edge Function JWT verification.
 4. Check KIE credits and pricing before generating or separating stems. KIE media URLs expire after a limited retention period.
 
 This integration keeps the KIE secret out of the mobile app. For production, add user authentication and per-user rate limiting to the Edge Function before public release. Build and test the Flutter app on Android before distributing an APK.
