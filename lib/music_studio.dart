@@ -131,7 +131,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
     try {
       final dir = await getApplicationDocumentsDirectory();
       const sampleRate = 44100;
-      const bpmValue = 110.0;
+      final bpmValue = bpm.toDouble();
       final secondsPerBeat = 60.0 / bpmValue;
       final sampleCount = (16 * secondsPerBeat * sampleRate).round();
       final pcm = Int16List(sampleCount);
@@ -340,7 +340,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 10), padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: _studioPanel, borderRadius: BorderRadius.circular(14)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [const Icon(Icons.grid_view, color: _studioCyan), const SizedBox(width: 8), const Text('16-STEP DRUM PATTERN', style: TextStyle(fontWeight: FontWeight.w800)), const Spacer(), const Text('110 BPM', style: TextStyle(color: _studioCyan))]),
+                Row(children: [const Icon(Icons.grid_view, color: _studioCyan), const SizedBox(width: 8), const Text('16-STEP DRUM PATTERN', style: TextStyle(fontWeight: FontWeight.w800)), const Spacer(), Text('$bpm BPM', style: const TextStyle(color: _studioCyan))]),
                 const SizedBox(height: 6), const Text('Kick / snare pattern', style: TextStyle(fontSize: 11, color: Colors.white60)),
                 Wrap(spacing: 4, runSpacing: 4, children: List.generate(16, (i) => SizedBox(width: 30, height: 32, child: FilledButton(onPressed: () => setState(() { if (drumSteps.contains(i)) { drumSteps.remove(i); } else { drumSteps.add(i); } }), style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: drumSteps.contains(i) ? _studioPurple : Colors.white12), child: Text('${i + 1}', style: const TextStyle(fontSize: 10))))),
                 const SizedBox(height: 6), const Text('Hi-hat pattern', style: TextStyle(fontSize: 11, color: Colors.white60)),
@@ -451,7 +451,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   style: FilledButton.styleFrom(backgroundColor: _studioPurple, padding: const EdgeInsets.symmetric(vertical: 14)),
                 ),
                 const SizedBox(height: 4),
-                const Text('Includes multitrack mix, gain, mute, track ordering, BPM notes, basic export effects and session save/load. Live recording, instrument synthesis and real-time playback still require a dedicated audio engine.',
+                const Text('Includes mic recording, per-track preview, waveform-style lanes, a synthesized 16-step drum sequencer, beat cutting, KIE AI generation/stems, EQ-style tone shaping, compression, normalization, and MP3 mix export. The waveform is a visual guide rather than a decoded sample-accurate waveform; playback is per-track preview, not synchronized multitrack transport.',
                   style: TextStyle(fontSize: 10, color: Colors.white38)),
               ]),
             ),
@@ -892,7 +892,7 @@ class _TrackWaveformPainter extends CustomPainter {
     var value = seed.abs() + 1;
     for (var x = 2.0; x < size.width; x += 4) {
       value = (value * 1103515245 + 12345) & 0x7fffffff;
-      final amplitude = 2.0 + (value % (size.height.toInt().clamp(2, 22))) / 2;
+      final amplitude = 2.0 + (value % (size.height.toInt().clamp(2, 22))) / 2.0;
       canvas.drawLine(Offset(x, size.height / 2 - amplitude), Offset(x, size.height / 2 + amplitude), paint);
     }
   }
