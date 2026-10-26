@@ -106,6 +106,13 @@ class _EditorHomeState extends State<EditorHome> {
       '16:9' => '1920:1080', '1:1' => '1080:1080', '4:5' => '1080:1350', _ => '1080:1920'
     };
     final bits = <String>[
+      switch (filterPreset) {
+        'Warm' => 'eq=saturation=1.25:contrast=1.05:brightness=0.02',
+        'Black & white' => 'hue=s=0',
+        'Vintage' => 'eq=saturation=0.80:contrast=1.10:brightness=0.02',
+        'Cool' => 'colorbalance=rs=-0.05:bs=0.08',
+        _ => 'null'
+      },
       'scale=$size:force_original_aspect_ratio=increase',
       'crop=$size', 'setsar=1'
     ];
@@ -162,7 +169,7 @@ class _EditorHomeState extends State<EditorHome> {
       final data = {
         'version': 1, 'videoPath': videoPath, 'audioPath': audioPath,
         'trimIn': trimIn, 'trimOut': trimOut, 'ratio': ratio,
-        'transition': transition, 'overlayText': overlayText,
+        'transition': transition, 'overlayText': overlayText, 'filterPreset': filterPreset,
         'musicVolume': musicVolume, 'speed': speed,
         'savedAt': DateTime.now().toIso8601String()
       };
@@ -192,6 +199,7 @@ class _EditorHomeState extends State<EditorHome> {
         ratio = data['ratio'] as String? ?? '9:16';
         transition = data['transition'] as String? ?? 'Fade in/out';
         overlayText = data['overlayText'] as String? ?? '';
+        filterPreset = data['filterPreset'] as String? ?? 'Original';
         musicVolume = (data['musicVolume'] as num?)?.toDouble() ?? .75;
         speed = (data['speed'] as num?)?.toDouble() ?? 1;
         trimIn = (data['trimIn'] as num?)?.toDouble() ?? 0;
@@ -278,7 +286,7 @@ class _EditorHomeState extends State<EditorHome> {
               if (overlayText.isNotEmpty) Positioned(left: 10, right: 10, bottom: 34, child: Container(color: Colors.black54, padding: const EdgeInsets.all(8), child: Text(overlayText, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold))))
             ]))) else const Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.movie_creation_outlined, size: 58, color: cyan), SizedBox(height: 12), Text('Make every frame count'), Text('Import a video to begin', style: TextStyle(color: Colors.white60))]),
             if (busy) const CircularProgressIndicator(color: cyan),
-            Positioned(left: 12, right: 12, top: 12, child: Row(children: [pill(ratio, Icons.aspect_ratio), const Spacer(), pill(transition, Icons.auto_awesome_motion)])),
+            Positioned(left: 12, right: 12, top: 12, child: Row(children: [pill(ratio, Icons.aspect_ratio), const Spacer(), pill('$filterPreset • $transition', Icons.auto_awesome_motion)])),
             Positioned(bottom: 4, left: 6, right: 6, child: Row(children: [
               IconButton(onPressed: () { setState(() => muted = !muted); video?.setVolume(muted ? 0 : 1); }, icon: Icon(muted ? Icons.volume_off : Icons.volume_up)),
               Text(time(pos), style: const TextStyle(fontSize: 11)),
@@ -312,7 +320,8 @@ class _EditorHomeState extends State<EditorHome> {
           SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
             const Text('Canvas', style: TextStyle(color: Colors.white60, fontSize: 12)),
             for (final r in ['9:16','16:9','1:1','4:5']) Padding(padding: const EdgeInsets.only(left: 4), child: ChoiceChip(label: Text(r), selected: ratio == r, onSelected: (_) => setState(() => ratio = r), visualDensity: VisualDensity.compact)),
-            PopupMenuButton<double>(initialValue: speed, onSelected: (s) async { setState(() => speed = s); await video?.setPlaybackSpeed(s); }, itemBuilder: (_) => [.5,.75,1.0,1.25,1.5,2.0].map((s) => PopupMenuItem(value:s, child: Text('${s}× speed'))).toList(), child: Padding(padding: const EdgeInsets.all(8), child: Text('${speed}×', style: const TextStyle(color: cyan))))
+            PopupMenuButton<double>(initialValue: speed, onSelected: (s) async { setState(() => speed = s); await video?.setPlaybackSpeed(s); }, itemBuilder: (_) => [.5,.75,1.0,1.25,1.5,2.0].map((s) => PopupMenuItem(value:s, child: Text('${s}× speed'))).toList(), child: Padding(padding: const EdgeInsets.all(8), child: Text('${speed}×', style: const TextStyle(color: cyan)))),
+            PopupMenuButton<String>(initialValue: filterPreset, onSelected: (f) => setState(() { filterPreset = f; lastExport = null; }), itemBuilder: (_) => ['Original','Warm','Black & white','Vintage','Cool'].map((f) => PopupMenuItem(value: f, child: Text(f))).toList(), child: Padding(padding: const EdgeInsets.all(8), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.filter_vintage, color: cyan, size: 18), const SizedBox(width: 4), Text(filterPreset, style: const TextStyle(color: cyan))])))
           ])),
           if (audioPath != null) Row(children: [const Text('Music', style: TextStyle(fontSize: 11)), Expanded(child: Slider(value: musicVolume, min: 0, max: 1.5, divisions: 15, onChanged: (n) => setState(() => musicVolume = n))), Text('${(musicVolume*100).round()}%', style: const TextStyle(fontSize: 11))]),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
