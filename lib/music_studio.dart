@@ -85,7 +85,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
         filters.add('[$i:a]volume=${active[i].gain.toStringAsFixed(3)}[a$i]');
       }
       final labels = List.generate(active.length, (i) => '[a$i]').join();
-      filters.add('${labels}amix=inputs=${active.length}:duration=longest:dropout_transition=0:normalize=0[aout]');
+      final fx = effect == 'Echo' ? ',aecho=0.8:0.75:70:0.25' : effect == 'Reverb' ? ',aecho=0.8:0.9:80|160:0.25|0.15' : effect == 'Warmth' ? ',equalizer=f=180:t=q:w=1:g=2,equalizer=f=7000:t=q:w=1:g=-1.5' : '';
+      filters.add('${labels}amix=inputs=${active.length}:duration=longest:dropout_transition=0:normalize=0,volume=${masterGain.toStringAsFixed(3)}$fx[aout]');
       final command = '-y ${inputs.join(' ')} -filter_complex "${filters.join(';')}" '
           '-map "[aout]" -c:a libmp3lame -b:a 192k -ar 44100 ${quote(output)}';
       final session = await FFmpegKit.execute(command);
@@ -180,7 +181,9 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                   studioButton('Add beat', Icons.album_outlined, () => addTracks('Beat')),
                   studioButton('Add vocals', Icons.mic_none, () => addTracks('Vocals')),
                   studioButton('Add instrument', Icons.piano, () => addTracks('Instrument')),
-                  studioButton('Add audio', Icons.library_music, () => addTracks('Audio')),\n                  studioButton('Load session', Icons.folder_open, loadSession),\n                  studioButton('Save session', Icons.save_outlined, saveSession),
+                  studioButton('Add audio', Icons.library_music, () => addTracks('Audio')),
+                  studioButton('Load session', Icons.folder_open, loadSession),
+                  studioButton('Save session', Icons.save_outlined, saveSession),
                 ]),
               ]),
             ),
@@ -206,9 +209,10 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                       SizedBox(height: 4),
                       Text('Add a beat or vocal track to begin.', style: TextStyle(color: Colors.white54)),
                     ]))
-                  : ListView.builder(
+                  : ReorderableListView.builder(
                       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                       itemCount: tracks.length,
+                      onReorder: (oldIndex, newIndex) { setState(() { if (newIndex > oldIndex) newIndex--; final item = tracks.removeAt(oldIndex); tracks.insert(newIndex, item); }); },
                       itemBuilder: (context, index) {
                         final track = tracks[index];
                         return Container(
@@ -233,7 +237,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
                                 const SizedBox(height: 3),
                                 Text(track.kind.toUpperCase(), style: const TextStyle(fontSize: 10, color: _studioCyan, letterSpacing: 1)),
                               ])),
-                              const Icon(Icons.drag_handle, color: Colors.white38),\n                              IconButton(tooltip: track.muted ? 'Unmute track' : 'Mute track',
+                              const Icon(Icons.drag_handle, color: Colors.white38),
+                              IconButton(tooltip: track.muted ? 'Unmute track' : 'Mute track',
                                 onPressed: () => setState(() => track.muted = !track.muted),
                                 icon: Icon(track.muted ? Icons.volume_off : Icons.volume_up)),
                               IconButton(tooltip: 'Remove track', onPressed: () => setState(() {
@@ -260,6 +265,18 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
               decoration: const BoxDecoration(color: _studioPanel, border: Border(top: BorderSide(color: Colors.white12))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (exporting) const LinearProgressIndicator(minHeight: 3),
+                Row(children: [
+                  const Text('BPM', style: TextStyle(fontWeight: FontWeight.bold)),
+                  IconButton(onPressed: bpm <= 40 ? null : () => setState(() => bpm--), icon: const Icon(Icons.remove_circle_outline)),
+                  Text('$bpm', style: const TextStyle(color: _studioCyan, fontWeight: FontWeight.bold)),
+                  IconButton(onPressed: bpm >= 240 ? null : () => setState(() => bpm++), icon: const Icon(Icons.add_circle_outline)),
+                  const Spacer(), const Text('Effect'), const SizedBox(width: 8),
+                  DropdownButton<String>(value: effect, items: const ['None','Echo','Reverb','Warmth'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => effect = v ?? effect)),
+                ]),
+                Row(children: [const Icon(Icons.tune, size: 18), const SizedBox(width: 8), const Text('Master'),
+                  Expanded(child: Slider(value: masterGain, min: 0, max: 1.5, divisions: 30, onChanged: (v) => setState(() => masterGain = v))),
+                  Text('${(masterGain * 100).round()}%', style: const TextStyle(color: _studioCyan)),
+                ]),
                 Text(status, maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: Colors.white60)),
                 const SizedBox(height: 10),
