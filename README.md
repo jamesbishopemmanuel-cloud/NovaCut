@@ -13,6 +13,8 @@ NovaCut is an original Flutter-based, CapCut-inspired Android editor with its ow
 - Choose export color looks: Original, Warm, Black & white, Vintage and Cool; the selected look is saved with the offline project.
 - Save/load project settings and local media paths as an offline JSON project.
 - Share an exported MP4 through the Android share sheet.
+- Open **AI Tools** from the home app bar for KIE image, video and music task requests.
+- Sign in or create a Supabase account from AI Tools, submit a KIE model ID and its JSON input parameters, check task status, and review/delete locally saved generation history.
 - GitHub Actions workflow builds an Android APK.
 
 ## Limitations and release notes
@@ -71,4 +73,4 @@ Check a task:
 
 Call the deployed function at `<SUPABASE_URL>/functions/v1/kie-ai` with `Content-Type: application/json`, the Supabase publishable key in the `apikey` header, and the signed-in user's access token in the Authorization header. Model IDs and input fields differ by KIE model; use the matching model documentation. A created task is not finished until its status reports completion.
 
-**Important:** The Edge Function code is committed, but it has not been deployed to Supabase and no KIE key has been configured. NovaCut's Flutter UI is not yet wired to call this function; that requires connecting the app to the intended Supabase project and adding sign-in plus AI-generation screens.
+**Important:** The Edge Function code is committed, but it has not been deployed to Supabase and no KIE key has been configured. NovaCut's Flutter AI Tools screen now calls this function and stores request history locally. The function must still be deployed, the KIE_API_KEY secret must be configured, and the Supabase email/auth settings and model-specific KIE IDs/input schemas must be set correctly. The screen lets you enter the exact model ID and JSON fields required by that model.
