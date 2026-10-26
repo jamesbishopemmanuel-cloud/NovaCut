@@ -480,26 +480,6 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       ),
     );
   }
-}
-), '')}/functions/v1/kie-music');
-      final request = await client.postUrl(uri);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set('apikey', _supabaseKey);
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_supabaseKey');
-      request.write(jsonEncode(body));
-      final response = await request.close();
-      final textBody = await response.transform(utf8.decoder).join();
-      final decoded = jsonDecode(textBody);
-      if (decoded is! Map<String, dynamic>) throw Exception('Unexpected AI server response.');
-      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['error'] != null) {
-        throw Exception(decoded['error'] ?? decoded['message'] ?? 'AI server returned HTTP ${response.statusCode}');
-      }
-      return decoded;
-    } finally {
-      client.close(force: true);
-    }
-  }
-
   Future<Map<String, dynamic>> _waitForKieTask(String taskId) async {
     for (var attempt = 0; attempt < 120; attempt++) {
       await Future<void>.delayed(const Duration(seconds: 3));
@@ -668,6 +648,8 @@ class _MusicStudioPageState extends State<MusicStudioPage> {
       message('Could not import audio: $e');
     }
   }
+
+}
 
 class _TrackWaveformPainter extends CustomPainter {
   const _TrackWaveformPainter({required this.seed, required this.color});
