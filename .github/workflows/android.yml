@@ -37,18 +37,18 @@ jobs:
           for path in files:
               source = path.read_text()
               updated = source
-              if re.search(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", "compileSdk = 36", updated)
-              elif re.search(r"compileSdk\\s*=\\s*\\d+", updated):
-                  updated = re.sub(r"compileSdk\\s*=\\s*\\d+", "compileSdk = 36", updated, count=1)
-              elif re.search(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", "compileSdkVersion 36", updated)
-              elif re.search(r"compileSdkVersion\\s+\\d+", updated):
-                  updated = re.sub(r"compileSdkVersion\\s+\\d+", "compileSdkVersion 36", updated, count=1)
+              if re.search(r"compileSdk\s*=\s*flutter\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = 36", updated)
+              elif re.search(r"compileSdk\s*=\s*\d+", updated):
+                  updated = re.sub(r"compileSdk\s*=\s*\d+", "compileSdk = 36", updated, count=1)
+              elif re.search(r"compileSdkVersion\s+flutter\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdkVersion\s+flutter\.compileSdkVersion", "compileSdkVersion 36", updated)
+              elif re.search(r"compileSdkVersion\s+\d+", updated):
+                  updated = re.sub(r"compileSdkVersion\s+\d+", "compileSdkVersion 36", updated, count=1)
               else:
                   raise SystemExit(f"Could not locate compileSdk setting in {path}")
-              updated = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", updated)
-              updated = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", updated)
+              updated = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 24", updated)
+              updated = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 24", updated)
               path.write_text(updated)
 
           # Some Flutter plugins set their own compileSdk (the failing
@@ -75,7 +75,7 @@ jobs:
           }
           """
           if "Keep every Android plugin module compatible with API 36 dependencies." not in root_source:
-              root_gradle.write_text(root_source.rstrip() + "\\n" + override)
+              root_gradle.write_text(root_source.rstrip() + "\n" + override)
           print("Set app and Android plugin modules to compile SDK 36; minimum SDK 24.")
           PY
       - name: Install Android SDK Platform 36
