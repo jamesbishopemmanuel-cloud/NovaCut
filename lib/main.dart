@@ -383,12 +383,35 @@ class _AiToolsPageState extends State<AiToolsPage> {
 
   Future<void> loadHistory() async {
     try {
+      final user = client.auth.currentUser;
+      if (user != null) {
+        final rows = await client.from('ai_generation_history').select()
+          .eq('user_id', user.id).order('created_at', ascending: false).limit(100);
+        final items = (rows as List).map((row) => <String, dynamic>{
+          'id': row['id'], 'type': row['type'], 'model': row['model'],
+          'prompt': row['prompt'] ?? '', 'taskId': row['task_id'] ?? '',
+          'status': row['status'] ?? 'Submitted', 'response': row['response'] ?? '',
+          'createdAt': row['created_at'],
+        }).toList();
+        if (mounted) setState(() => history = items);
+        await saveHistory();
+        return;
+      }
       final file = await historyFile();
       if (await file.exists()) {
         final decoded = jsonDecode(await file.readAsString()) as List;
         if (mounted) setState(() => history = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
       }
-    } catch (_) {}
+    } catch (e) {
+      try {
+        final file = await historyFile();
+        if (await file.exists()) {
+          final decoded = jsonDecode(await file.readAsString()) as List;
+          if (mounted) setState(() => history = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
+        }
+      } catch (_) {}
+      showMessage('Could not load cloud history. Run supabase/schema.sql in the Supabase SQL Editor. $e');
+    }
   }
 
   Future<void> saveHistory() async {
@@ -453,9 +476,18 @@ class _AiToolsPageState extends State<AiToolsPage> {
         'taskId': taskId, 'status': 'Submitted', 'response': data.toString(),
         'createdAt': DateTime.now().toIso8601String(),
       };
+      final user = client.auth.currentUser;
+      if (user == null) throw Exception('Sign in before saving AI history.');
+      final saved = await client.from('ai_generation_history').insert({
+        'user_id': user.id, 'type': item['type'], 'model': item['model'],
+        'prompt': item['prompt'], 'task_id': item['taskId'],
+        'status': item['status'], 'response': item['response'],
+      }).select().single();
+      item['id'] = saved['id'];
+      item['createdAt'] = saved['created_at'];
       setState(() => history.insert(0, item));
       await saveHistory();
-      showMessage(taskId.isEmpty ? 'Request submitted. Check KIE response in history.' : 'Generation task submitted.');
+      showMessage(taskId.isEmpty ? 'Request submitted and saved to Supabase.' : 'Generation task submitted and saved to Supabase.');
     } on FunctionException catch (e) {
       showMessage('AI request failed: ${e.details ?? e.reasonPhrase ?? e.toString()}');
     } catch (e) {
@@ -471,11 +503,17 @@ class _AiToolsPageState extends State<AiToolsPage> {
     try {
       final response = await client.functions.invoke('kie-ai', body: {'action': 'status', 'taskId': taskId});
       if (response.status < 200 || response.status >= 300) throw Exception('HTTP ${response.status}: ${response.data}');
-      setState(() {
-        history[index]['status'] = 'Status checked';
-        history[index]['response'] = response.data.toString();
-        history[index]['checkedAt'] = DateTime.now().toIso8601String();
-      });
+      final item = history[index];
+      item['status'] = 'Status checked';
+      item['response'] = response.data.toString();
+      item['checkedAt'] = DateTime.now().toIso8601String();
+      final id = item['id'];
+      if (id != null) {
+        await client.from('ai_generation_history').update({
+          'status': item['status'], 'response': item['response'],
+        }).eq('id', id).eq('user_id', client.auth.currentUser!.id);
+      }
+      setState(() {});
       await saveHistory();
       showMessage('Latest provider response saved to history.');
     } catch (e) {
@@ -531,7 +569,18 @@ class _AiToolsPageState extends State<AiToolsPage> {
             Row(children: [Icon(item['type'] == 'Image' ? Icons.image : item['type'] == 'Video' ? Icons.movie : Icons.music_note, color: cyan), const SizedBox(width: 8), Expanded(child: Text('${item['type']} • ${item['model'] ?? 'KIE'}', style: const TextStyle(fontWeight: FontWeight.bold))), Text(item['status']?.toString() ?? 'Submitted', style: const TextStyle(color: cyan, fontSize: 11))]),
             const SizedBox(height: 6), Text(item['prompt']?.toString().isNotEmpty == true ? item['prompt'].toString() : 'No prompt text', maxLines: 3, overflow: TextOverflow.ellipsis),
             if ((item['taskId']?.toString() ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Task: ${item['taskId']}', style: const TextStyle(color: Colors.white54, fontSize: 11))),
-            Row(children: [TextButton.icon(onPressed: busy ? null : () => checkStatus(i), icon: const Icon(Icons.refresh, size: 16), label: const Text('Check status')), const Spacer(), IconButton(onPressed: () async { setState(() => history.removeAt(i)); await saveHistory(); }, icon: const Icon(Icons.delete_outline))])
+            Row(children: [TextButton.icon(onPressed: busy ? null : () => checkStatus(i), icon: const Icon(Icons.refresh, size: 16), label: const Text('Check status')), const Spacer(), IconButton(onPressed: () async {
+              final item = history[i];
+              final id = item['id'];
+              try {
+                if (id != null && client.auth.currentUser != null) {
+                  await client.from('ai_generation_history').delete()
+                    .eq('id', id).eq('user_id', client.auth.currentUser!.id);
+                }
+                setState(() => history.removeAt(i));
+                await saveHistory();
+              } catch (e) { showMessage('Could not delete saved history: $e'); }
+            }, icon: const Icon(Icons.delete_outline))])
           ])));
         }),
       ])),
