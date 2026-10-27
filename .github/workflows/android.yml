@@ -36,23 +36,20 @@ jobs:
           for path in files:
               source = path.read_text()
               updated = source
-              if re.search(r"compileSdk\s*=\s*flutter\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = 36", updated)
-              elif re.search(r"compileSdk\s*=\s*\d+", updated):
-                  updated = re.sub(r"compileSdk\s*=\s*\d+", "compileSdk = 36", updated, count=1)
-              elif re.search(r"compileSdkVersion\s+flutter\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdkVersion\s+flutter\.compileSdkVersion", "compileSdkVersion 36", updated)
-              elif re.search(r"compileSdkVersion\s+\d+", updated):
-                  updated = re.sub(r"compileSdkVersion\s+\d+", "compileSdkVersion 36", updated, count=1)
+              if re.search(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", "compileSdk = 36", updated)
+              elif re.search(r"compileSdk\\s*=\\s*\\d+", updated):
+                  updated = re.sub(r"compileSdk\\s*=\\s*\\d+", "compileSdk = 36", updated, count=1)
+              elif re.search(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", "compileSdkVersion 36", updated)
+              elif re.search(r"compileSdkVersion\\s+\\d+", updated):
+                  updated = re.sub(r"compileSdkVersion\\s+\\d+", "compileSdkVersion 36", updated, count=1)
               else:
                   raise SystemExit(f"Could not locate compileSdk setting in {path}")
-              updated = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 24", updated)
-              updated = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 24", updated)
+              updated = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", updated)
+              updated = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", updated)
               path.write_text(updated)
 
-          # Configure Android library modules when their Android plugin is applied.
-          # Do not use afterEvaluate: Flutter's evaluationDependsOn(":app") may
-          # evaluate a project before this callback is registered.
           groovy_root = Path("android/build.gradle")
           kotlin_root = Path("android/build.gradle.kts")
           root_gradle = groovy_root if groovy_root.exists() else kotlin_root
@@ -86,7 +83,7 @@ jobs:
                       }
                   }
                   """
-              root_gradle.write_text(root_source.rstrip() + "\n" + override)
+              root_gradle.write_text(root_source.rstrip() + "\\n" + override)
           print("Set app and Android library modules to compile SDK 36; minimum SDK 24.")
           PY
       - name: Install Android SDK Platform 36
@@ -104,14 +101,10 @@ jobs:
           roots = [Path.home() / ".pub-cache" / "hosted" / "pub.dev"]
           changed = []
           checked = 0
-
           patterns = [
-              # Kotlin DSL: compileSdk = 34 / flutter.compileSdkVersion
-              (re.compile(r"(?m)^(\s*compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
-              # Groovy DSL: compileSdkVersion 34 / flutter.compileSdkVersion
-              (re.compile(r"(?m)^(\s*compileSdkVersion\s+)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
-              # Groovy DSL: compileSdk 34 / flutter.compileSdkVersion
-              (re.compile(r"(?m)^(\s*compileSdk\s+)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
+              (re.compile(r"(?m)^(\\s*compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              (re.compile(r"(?m)^(\\s*compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              (re.compile(r"(?m)^(\\s*compileSdk\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
           ]
 
           for root in roots:
@@ -135,7 +128,6 @@ jobs:
           for path in changed:
               print(f"Patched: {path}")
 
-          # Fail early with a clear message if these plugins still pin SDK 34.
           for plugin in ("file_picker", "flutter_plugin_android_lifecycle"):
               matches = list((Path.home() / ".pub-cache" / "hosted" / "pub.dev").glob(f"{plugin}-*/android/build.gradle*"))
               if not matches:
@@ -143,15 +135,35 @@ jobs:
                   continue
               for path in matches:
                   source = path.read_text()
-                  if re.search(r"(?m)^\s*compileSdk(?:Version)?\s*(?:=\s*)?(?:34|flutter\.compileSdkVersion)", source):
+                  if re.search(r"(?m)^\\s*compileSdk(?:Version)?\\s*(?:=\\s*)?(?:34|flutter\\.compileSdkVersion)", source):
                       raise SystemExit(f"{plugin} still has an unpatched compile SDK setting in {path}")
           PY
       - name: Analyze Flutter code
         run: flutter analyze
       - name: Build release APKs
         run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
-      - name: Upload APK artifact
+      - name: Report APK sizes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for apk in sorted(Path("build/app/outputs/flutter-apk").glob("*.apk")):
+              print(f"{apk.name}: {apk.stat().st_size / (1024 * 1024):.2f} MiB")
+          PY
+      - name: Upload ARM64 APK (recommended for most modern phones)
         uses: actions/upload-artifact@v4
         with:
-          name: novacut-release-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          name: novacut-arm64-v8a-apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+      - name: Upload ARM32 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: novacut-armeabi-v7a-apk
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          if-no-files-found: warn
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: novacut-x86_64-apk
+          path: build/app/outputs/flutter-apk/app-x86_64-release.apk
+          if-no-files-found: warn
