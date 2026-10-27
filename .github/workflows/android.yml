@@ -47,14 +47,16 @@ jobs:
                   path.write_text(updated)
           print("Set Android compile SDK to 36 and minimum SDK to 24.")
           PY
+      - name: Install Android SDK Platform 36
+        run: yes | sdkmanager --licenses && sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Resolve dependencies
         run: flutter pub get
       - name: Analyze Flutter code
         run: flutter analyze
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build release APKs
+        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: novacut-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
