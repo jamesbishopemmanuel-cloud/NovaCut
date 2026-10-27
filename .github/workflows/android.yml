@@ -95,39 +95,56 @@ jobs:
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Resolve dependencies
         run: flutter pub get
-      - name: Ensure plugin Android modules compile with SDK 36
+      - name: Force all cached Android plugins to compile SDK 36
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
 
-          roots = [Path.home() / ".pub-cache" / "hosted"]
+          roots = [Path.home() / ".pub-cache" / "hosted" / "pub.dev"]
           changed = []
+          checked = 0
+
+          patterns = [
+              # Kotlin DSL: compileSdk = 34 / flutter.compileSdkVersion
+              (re.compile(r"(?m)^(\\s*compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              # Groovy DSL: compileSdkVersion 34 / flutter.compileSdkVersion
+              (re.compile(r"(?m)^(\\s*compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              # Groovy DSL: compileSdk 34 / flutter.compileSdkVersion
+              (re.compile(r"(?m)^(\\s*compileSdk\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+          ]
+
           for root in roots:
               if not root.exists():
                   continue
-              for path in root.glob("pub.dev/*/android/build.gradle*"):
+              for path in root.glob("*/**/android/build.gradle*"):
                   try:
                       source = path.read_text()
                   except (OSError, UnicodeError):
                       continue
+                  checked += 1
                   updated = source
-                  updated = re.sub(
-                      r"(compileSdkVersion\s+)(?:flutter\.compileSdkVersion|\d+)",
-                      r"\g<1>36",
-                      updated,
-                  )
-                  updated = re.sub(
-                      r"(compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)",
-                      r"\g<1>36",
-                      updated,
-                  )
+                  for pattern, replacement in patterns:
+                      updated = pattern.sub(replacement, updated)
                   if updated != source:
                       path.write_text(updated)
                       changed.append(str(path))
-          print(f"Updated {len(changed)} cached plugin Gradle files to compile SDK 36.")
+
+          print(f"Checked {checked} cached Android plugin Gradle files.")
+          print(f"Raised compile SDK to 36 in {len(changed)} plugin files.")
           for path in changed:
-              print(path)
+              print(f"Patched: {path}")
+
+          # Fail early with a clear message if these plugins still pin SDK 34.
+          for plugin in ("file_picker", "flutter_plugin_android_lifecycle"):
+              matches = list((Path.home() / ".pub-cache" / "hosted" / "pub.dev").glob(f"{plugin}-*/android/build.gradle*"))
+              if not matches:
+                  print(f"Notice: no cached Gradle file found for {plugin}.")
+                  continue
+              for path in matches:
+                  source = path.read_text()
+                  if re.search(r"(?m)^\\s*compileSdk(?:Version)?\\s*(?:=\\s*)?(?:34|flutter\\.compileSdkVersion)", source):
+                      raise SystemExit(f"{plugin} still has an unpatched compile SDK setting in {path}")
           PY
       - name: Analyze Flutter code
         run: flutter analyze
