@@ -19,7 +19,6 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # The legacy "tools" SDK package has been removed from Google's repository.
           packages: platform-tools
       - name: Generate Android platform files
         run: flutter create --platforms=android --project-name novacut .
@@ -37,23 +36,23 @@ jobs:
           for path in files:
               source = path.read_text()
               updated = source
-              if re.search(r"compileSdk\s*=\s*flutter\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = 36", updated)
-              elif re.search(r"compileSdk\s*=\s*\d+", updated):
-                  updated = re.sub(r"compileSdk\s*=\s*\d+", "compileSdk = 36", updated, count=1)
-              elif re.search(r"compileSdkVersion\s+flutter\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdkVersion\s+flutter\.compileSdkVersion", "compileSdkVersion 36", updated)
-              elif re.search(r"compileSdkVersion\s+\d+", updated):
-                  updated = re.sub(r"compileSdkVersion\s+\d+", "compileSdkVersion 36", updated, count=1)
+              if re.search(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", "compileSdk = 36", updated)
+              elif re.search(r"compileSdk\\s*=\\s*\\d+", updated):
+                  updated = re.sub(r"compileSdk\\s*=\\s*\\d+", "compileSdk = 36", updated, count=1)
+              elif re.search(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", "compileSdkVersion 36", updated)
+              elif re.search(r"compileSdkVersion\\s+\\d+", updated):
+                  updated = re.sub(r"compileSdkVersion\\s+\\d+", "compileSdkVersion 36", updated, count=1)
               else:
                   raise SystemExit(f"Could not locate compileSdk setting in {path}")
-              updated = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 24", updated)
-              updated = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 24", updated)
+              updated = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", updated)
+              updated = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", updated)
               path.write_text(updated)
 
-          # Some Flutter plugins set their own compileSdk (the failing
-          # flutter_plugin_android_lifecycle dependency was still on API 34).
-          # Apply API 36 to every Android subproject, not just the app module.
+          # Configure Android library modules when their Android plugin is applied.
+          # Do not use afterEvaluate: Flutter's evaluationDependsOn(":app") may
+          # evaluate a project before this callback is registered.
           groovy_root = Path("android/build.gradle")
           kotlin_root = Path("android/build.gradle.kts")
           root_gradle = groovy_root if groovy_root.exists() else kotlin_root
@@ -61,33 +60,16 @@ jobs:
               raise SystemExit("Neither android/build.gradle nor android/build.gradle.kts was generated")
 
           root_source = root_gradle.read_text()
-          marker = "Keep every Android plugin module compatible with API 36 dependencies."
+          marker = "Configure Android library modules for compile SDK 36 without afterEvaluate."
           if marker not in root_source:
               if root_gradle.suffix == ".kts":
                   override = """
                   
-                  // Keep every Android plugin module compatible with API 36 dependencies.
+                  // Configure Android library modules for compile SDK 36 without afterEvaluate.
                   subprojects {
-                      afterEvaluate {
-                          val androidExtension = extensions.findByName("android")
-                          if (androidExtension != null) {
-                              val compileSdkSetter = androidExtension.javaClass.methods.firstOrNull {
-                                  (it.name == "setCompileSdk" || it.name == "setCompileSdkVersion") &&
-                                      it.parameterCount == 1 &&
-                                      (it.parameterTypes[0] == Integer.TYPE ||
-                                          it.parameterTypes[0] == Integer::class.java)
-                              }
-                              if (compileSdkSetter != null) {
-                                  compileSdkSetter.invoke(androidExtension, 36)
-                              } else {
-                                  val compileSdkMethod = androidExtension.javaClass.methods.firstOrNull {
-                                      it.name == "compileSdkVersion" && it.parameterCount == 1
-                                  }
-                                  if (compileSdkMethod == null) {
-                                      throw GradleException("Cannot set compile SDK 36 for ${project.path}")
-                                  }
-                                  compileSdkMethod.invoke(androidExtension, 36)
-                              }
+                      plugins.withId("com.android.library") {
+                          extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
+                              compileSdk = 36
                           }
                       }
                   }
@@ -95,18 +77,17 @@ jobs:
               else:
                   override = """
                   
-                  // Keep every Android plugin module compatible with API 36 dependencies.
+                  // Configure Android library modules for compile SDK 36 without afterEvaluate.
                   subprojects {
-                      afterEvaluate { subproject ->
-                          def androidExtension = subproject.extensions.findByName("android")
-                          if (androidExtension != null) {
-                              androidExtension.compileSdkVersion 36
+                      plugins.withId("com.android.library") {
+                          extensions.configure(com.android.build.gradle.LibraryExtension) {
+                              compileSdkVersion 36
                           }
                       }
                   }
                   """
-              root_gradle.write_text(root_source.rstrip() + "\n" + override)
-          print("Set app and Android plugin modules to compile SDK 36; minimum SDK 24.")
+              root_gradle.write_text(root_source.rstrip() + "\\n" + override)
+          print("Set app and Android library modules to compile SDK 36; minimum SDK 24.")
           PY
       - name: Install Android SDK Platform 36
         run: |
