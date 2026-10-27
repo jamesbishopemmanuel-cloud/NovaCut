@@ -440,6 +440,7 @@ class _AiToolsPageState extends State<AiToolsPage> {
         await client.auth.signInWithPassword(email: emailController.text.trim(), password: passwordController.text);
         showMessage('Signed in successfully.');
       }
+      if (client.auth.currentSession != null) await loadHistory();
       if (mounted) setState(() {});
     } on AuthException catch (e) {
       showMessage(e.message);
