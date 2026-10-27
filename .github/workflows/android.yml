@@ -95,6 +95,40 @@ jobs:
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Resolve dependencies
         run: flutter pub get
+      - name: Ensure plugin Android modules compile with SDK 36
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots = [Path.home() / ".pub-cache" / "hosted"]
+          changed = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.glob("pub.dev/*/android/build.gradle*"):
+                  try:
+                      source = path.read_text()
+                  except (OSError, UnicodeError):
+                      continue
+                  updated = source
+                  updated = re.sub(
+                      r"(compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|\\d+)",
+                      r"\\g<1>36",
+                      updated,
+                  )
+                  updated = re.sub(
+                      r"(compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|\\d+)",
+                      r"\\g<1>36",
+                      updated,
+                  )
+                  if updated != source:
+                      path.write_text(updated)
+                      changed.append(str(path))
+          print(f"Updated {len(changed)} cached plugin Gradle files to compile SDK 36.")
+          for path in changed:
+              print(path)
+          PY
       - name: Analyze Flutter code
         run: flutter analyze
       - name: Build release APKs
