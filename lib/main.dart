@@ -12,7 +12,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
     url: 'https://vihbsfrwnslnmheowkhy.supabase.co',
-    anonKey: 'sb_publishable_HIMGxb-O6fj9O7OzT4ukuQ_jm5W8mWz',
+    publishableKey: 'sb_publishable_HIMGxb-O6fj9O7OzT4ukuQ_jm5W8mWz',
   );
   runApp(const NovaCutApp());
 }
@@ -153,7 +153,7 @@ class _EditorHomeState extends State<EditorHome> {
           ..write('-filter_complex ${shellQuote('[0:v]$vf[v];[0:a]atrim=duration=$clip,asetpts=PTS-STARTPTS[a0];[1:a]volume=$musicVolume,atrim=duration=$clip,asetpts=PTS-STARTPTS[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=2[a]')} ')
           ..write('-map "[v]" -map "[a]" ');
       } else {
-        cmd..write('-t ${clip.toStringAsFixed(3)} -vf ${shellQuote(vf)} -map 0:v:0 -map 0:a? ');
+        cmd.write('-t ${clip.toStringAsFixed(3)} -vf ${shellQuote(vf)} -map 0:v:0 -map 0:a? ');
       }
       cmd..write('-c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 192k -movflags +faststart ')
         ..write(shellQuote(output));
@@ -329,7 +329,7 @@ class _EditorHomeState extends State<EditorHome> {
           SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
             const Text('Canvas', style: TextStyle(color: Colors.white60, fontSize: 12)),
             for (final r in ['9:16','16:9','1:1','4:5']) Padding(padding: const EdgeInsets.only(left: 4), child: ChoiceChip(label: Text(r), selected: ratio == r, onSelected: (_) => setState(() => ratio = r), visualDensity: VisualDensity.compact)),
-            PopupMenuButton<double>(initialValue: speed, onSelected: (s) async { setState(() => speed = s); await video?.setPlaybackSpeed(s); }, itemBuilder: (_) => [.5,.75,1.0,1.25,1.5,2.0].map((s) => PopupMenuItem(value:s, child: Text('${s}× speed'))).toList(), child: Padding(padding: const EdgeInsets.all(8), child: Text('${speed}×', style: const TextStyle(color: cyan)))),
+            PopupMenuButton<double>(initialValue: speed, onSelected: (s) async { setState(() => speed = s); await video?.setPlaybackSpeed(s); }, itemBuilder: (_) => [.5,.75,1.0,1.25,1.5,2.0].map((s) => PopupMenuItem(value:s, child: Text('$s× speed'))).toList(), child: Padding(padding: const EdgeInsets.all(8), child: Text('$speed×', style: const TextStyle(color: cyan)))),
             PopupMenuButton<String>(initialValue: filterPreset, onSelected: (f) => setState(() { filterPreset = f; lastExport = null; }), itemBuilder: (_) => ['Original','Warm','Black & white','Vintage','Cool'].map((f) => PopupMenuItem(value: f, child: Text(f))).toList(), child: Padding(padding: const EdgeInsets.all(8), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.filter_vintage, color: cyan, size: 18), const SizedBox(width: 4), Text(filterPreset, style: const TextStyle(color: cyan))])))
           ])),
           if (audioPath != null) Row(children: [const Text('Music', style: TextStyle(fontSize: 11)), Expanded(child: Slider(value: musicVolume, min: 0, max: 1.5, divisions: 15, onChanged: (n) => setState(() => musicVolume = n))), Text('${(musicVolume*100).round()}%', style: const TextStyle(fontSize: 11))]),
@@ -364,7 +364,6 @@ class _AiToolsPageState extends State<AiToolsPage> {
   bool creatingAccount = false, busy = false;
   List<Map<String, dynamic>> history = [];
   static const types = ['Image', 'Video', 'Music'];
-  static const typeIcons = [Icons.image_outlined, Icons.movie_creation_outlined, Icons.music_note_outlined];
   SupabaseClient get client => Supabase.instance.client;
 
   @override
@@ -409,8 +408,11 @@ class _AiToolsPageState extends State<AiToolsPage> {
     try {
       if (creatingAccount) {
         final result = await client.auth.signUp(email: emailController.text.trim(), password: passwordController.text);
-        if (result.session == null) showMessage('Account request sent. Check your email to confirm, then sign in.');
-        else showMessage('Signed in successfully.');
+        if (result.session == null) {
+          showMessage('Account request sent. Check your email to confirm, then sign in.');
+        } else {
+          showMessage('Signed in successfully.');
+        }
       } else {
         await client.auth.signInWithPassword(email: emailController.text.trim(), password: passwordController.text);
         showMessage('Signed in successfully.');
