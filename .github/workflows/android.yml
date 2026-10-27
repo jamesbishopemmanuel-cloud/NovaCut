@@ -61,15 +61,15 @@ jobs:
           override = """
           
           // Keep every Android plugin module compatible with API 36 dependencies.
-          subprojects {
-              plugins.withId("com.android.library") {
-                  android {
-                      compileSdkVersion 36
+          subprojects { project ->
+              project.plugins.withId("com.android.library") {
+                  project.afterEvaluate {
+                      project.android.compileSdkVersion 36
                   }
               }
-              plugins.withId("com.android.application") {
-                  android {
-                      compileSdkVersion 36
+              project.plugins.withId("com.android.application") {
+                  project.afterEvaluate {
+                      project.android.compileSdkVersion 36
                   }
               }
           }
