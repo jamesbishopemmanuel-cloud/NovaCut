@@ -107,11 +107,11 @@ jobs:
 
           patterns = [
               # Kotlin DSL: compileSdk = 34 / flutter.compileSdkVersion
-              (re.compile(r"(?m)^(\\s*compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              (re.compile(r"(?m)^(\s*compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
               # Groovy DSL: compileSdkVersion 34 / flutter.compileSdkVersion
-              (re.compile(r"(?m)^(\\s*compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              (re.compile(r"(?m)^(\s*compileSdkVersion\s+)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
               # Groovy DSL: compileSdk 34 / flutter.compileSdkVersion
-              (re.compile(r"(?m)^(\\s*compileSdk\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              (re.compile(r"(?m)^(\s*compileSdk\s+)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
           ]
 
           for root in roots:
@@ -143,7 +143,7 @@ jobs:
                   continue
               for path in matches:
                   source = path.read_text()
-                  if re.search(r"(?m)^\\s*compileSdk(?:Version)?\\s*(?:=\\s*)?(?:34|flutter\\.compileSdkVersion)", source):
+                  if re.search(r"(?m)^\s*compileSdk(?:Version)?\s*(?:=\s*)?(?:34|flutter\.compileSdkVersion)", source):
                       raise SystemExit(f"{plugin} still has an unpatched compile SDK setting in {path}")
           PY
       - name: Analyze Flutter code
