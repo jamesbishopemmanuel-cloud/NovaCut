@@ -54,27 +54,57 @@ jobs:
           # Some Flutter plugins set their own compileSdk (the failing
           # flutter_plugin_android_lifecycle dependency was still on API 34).
           # Apply API 36 to every Android subproject, not just the app module.
-          root_gradle = Path("android/build.gradle")
+          groovy_root = Path("android/build.gradle")
+          kotlin_root = Path("android/build.gradle.kts")
+          root_gradle = groovy_root if groovy_root.exists() else kotlin_root
           if not root_gradle.exists():
-              raise SystemExit("android/build.gradle was not generated")
+              raise SystemExit("Neither android/build.gradle nor android/build.gradle.kts was generated")
+
           root_source = root_gradle.read_text()
-          override = """
-          
-          // Keep every Android plugin module compatible with API 36 dependencies.
-          subprojects { project ->
-              project.plugins.withId("com.android.library") {
-                  project.afterEvaluate {
-                      project.android.compileSdkVersion 36
+          marker = "Keep every Android plugin module compatible with API 36 dependencies."
+          if marker not in root_source:
+              if root_gradle.suffix == ".kts":
+                  override = """
+                  
+                  // Keep every Android plugin module compatible with API 36 dependencies.
+                  subprojects {
+                      afterEvaluate {
+                          val androidExtension = extensions.findByName("android")
+                          if (androidExtension != null) {
+                              val compileSdkSetter = androidExtension.javaClass.methods.firstOrNull {
+                                  (it.name == "setCompileSdk" || it.name == "setCompileSdkVersion") &&
+                                      it.parameterCount == 1 &&
+                                      (it.parameterTypes[0] == Integer.TYPE ||
+                                          it.parameterTypes[0] == Integer::class.java)
+                              }
+                              if (compileSdkSetter != null) {
+                                  compileSdkSetter.invoke(androidExtension, 36)
+                              } else {
+                                  val compileSdkMethod = androidExtension.javaClass.methods.firstOrNull {
+                                      it.name == "compileSdkVersion" && it.parameterCount == 1
+                                  }
+                                  if (compileSdkMethod == null) {
+                                      throw GradleException("Cannot set compile SDK 36 for ${project.path}")
+                                  }
+                                  compileSdkMethod.invoke(androidExtension, 36)
+                              }
+                          }
+                      }
                   }
-              }
-              project.plugins.withId("com.android.application") {
-                  project.afterEvaluate {
-                      project.android.compileSdkVersion 36
+                  """
+              else:
+                  override = """
+                  
+                  // Keep every Android plugin module compatible with API 36 dependencies.
+                  subprojects {
+                      afterEvaluate { subproject ->
+                          def androidExtension = subproject.extensions.findByName("android")
+                          if (androidExtension != null) {
+                              androidExtension.compileSdkVersion 36
+                          }
+                      }
                   }
-              }
-          }
-          """
-          if "Keep every Android plugin module compatible with API 36 dependencies." not in root_source:
+                  """
               root_gradle.write_text(root_source.rstrip() + "\n" + override)
           print("Set app and Android plugin modules to compile SDK 36; minimum SDK 24.")
           PY
