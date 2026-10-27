@@ -16,6 +16,8 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
       - name: Generate Android platform files
         run: flutter create --platforms=android --project-name novacut .
       - name: Set Android compile SDK 36 and minimum SDK for FFmpeg
@@ -31,24 +33,26 @@ jobs:
               source = path.read_text()
               updated = source
               # Plugins in this project require Android API 36 to compile.
-              if re.search(r"compileSdk\s*=\s*flutter\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = 36", updated)
-              elif re.search(r"compileSdk\s*=\s*\d+", updated):
-                  updated = re.sub(r"compileSdk\s*=\s*\d+", "compileSdk = 36", updated, count=1)
-              elif re.search(r"compileSdkVersion\s+flutter\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdkVersion\s+flutter\.compileSdkVersion", "compileSdkVersion 36", updated)
-              elif re.search(r"compileSdkVersion\s+\d+", updated):
-                  updated = re.sub(r"compileSdkVersion\s+\d+", "compileSdkVersion 36", updated, count=1)
+              if re.search(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", "compileSdk = 36", updated)
+              elif re.search(r"compileSdk\\s*=\\s*\\d+", updated):
+                  updated = re.sub(r"compileSdk\\s*=\\s*\\d+", "compileSdk = 36", updated, count=1)
+              elif re.search(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", "compileSdkVersion 36", updated)
+              elif re.search(r"compileSdkVersion\\s+\\d+", updated):
+                  updated = re.sub(r"compileSdkVersion\\s+\\d+", "compileSdkVersion 36", updated, count=1)
               else:
                   raise SystemExit(f"Could not locate compileSdk setting in {path}")
-              updated = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 24", updated)
-              updated = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 24", updated)
+              updated = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", updated)
+              updated = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", updated)
               if updated != source:
                   path.write_text(updated)
           print("Set Android compile SDK to 36 and minimum SDK to 24.")
           PY
       - name: Install Android SDK Platform 36
-        run: yes | sdkmanager --licenses && sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Resolve dependencies
         run: flutter pub get
       - name: Analyze Flutter code
