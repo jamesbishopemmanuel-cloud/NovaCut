@@ -36,18 +36,18 @@ jobs:
           for path in files:
               source = path.read_text()
               updated = source
-              if re.search(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion", "compileSdk = 36", updated)
-              elif re.search(r"compileSdk\\s*=\\s*\\d+", updated):
-                  updated = re.sub(r"compileSdk\\s*=\\s*\\d+", "compileSdk = 36", updated, count=1)
-              elif re.search(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", updated):
-                  updated = re.sub(r"compileSdkVersion\\s+flutter\\.compileSdkVersion", "compileSdkVersion 36", updated)
-              elif re.search(r"compileSdkVersion\\s+\\d+", updated):
-                  updated = re.sub(r"compileSdkVersion\\s+\\d+", "compileSdkVersion 36", updated, count=1)
+              if re.search(r"compileSdk\s*=\s*flutter\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = 36", updated)
+              elif re.search(r"compileSdk\s*=\s*\d+", updated):
+                  updated = re.sub(r"compileSdk\s*=\s*\d+", "compileSdk = 36", updated, count=1)
+              elif re.search(r"compileSdkVersion\s+flutter\.compileSdkVersion", updated):
+                  updated = re.sub(r"compileSdkVersion\s+flutter\.compileSdkVersion", "compileSdkVersion 36", updated)
+              elif re.search(r"compileSdkVersion\s+\d+", updated):
+                  updated = re.sub(r"compileSdkVersion\s+\d+", "compileSdkVersion 36", updated, count=1)
               else:
                   raise SystemExit(f"Could not locate compileSdk setting in {path}")
-              updated = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", updated)
-              updated = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", updated)
+              updated = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 24", updated)
+              updated = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 24", updated)
               path.write_text(updated)
 
           groovy_root = Path("android/build.gradle")
@@ -83,7 +83,7 @@ jobs:
                       }
                   }
                   """
-              root_gradle.write_text(root_source.rstrip() + "\\n" + override)
+              root_gradle.write_text(root_source.rstrip() + "\n" + override)
           print("Set app and Android library modules to compile SDK 36; minimum SDK 24.")
           PY
       - name: Install Android SDK Platform 36
@@ -102,9 +102,9 @@ jobs:
           changed = []
           checked = 0
           patterns = [
-              (re.compile(r"(?m)^(\\s*compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
-              (re.compile(r"(?m)^(\\s*compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
-              (re.compile(r"(?m)^(\\s*compileSdk\\s+)(?:flutter\\.compileSdkVersion|\\d+)"), r"\\g<1>36"),
+              (re.compile(r"(?m)^(\s*compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
+              (re.compile(r"(?m)^(\s*compileSdkVersion\s+)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
+              (re.compile(r"(?m)^(\s*compileSdk\s+)(?:flutter\.compileSdkVersion|\d+)"), r"\g<1>36"),
           ]
 
           for root in roots:
@@ -135,7 +135,7 @@ jobs:
                   continue
               for path in matches:
                   source = path.read_text()
-                  if re.search(r"(?m)^\\s*compileSdk(?:Version)?\\s*(?:=\\s*)?(?:34|flutter\\.compileSdkVersion)", source):
+                  if re.search(r"(?m)^\s*compileSdk(?:Version)?\s*(?:=\s*)?(?:34|flutter\.compileSdkVersion)", source):
                       raise SystemExit(f"{plugin} still has an unpatched compile SDK setting in {path}")
           PY
       - name: Analyze Flutter code
